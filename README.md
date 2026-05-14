@@ -1,6 +1,6 @@
 # phone-portal
 
-Send files from iPhone/iPad to any AI agent. No Swift. No Xcode. FastAPI + Safari.
+Send files from any phone or tablet to any AI agent. No native app required. FastAPI + mobile browser.
 
 Scan a QR, open the page, upload files or paste text. Agent reads them instantly.
 
@@ -9,8 +9,8 @@ Scan a QR, open the page, upload files or paste text. Agent reads them instantly
 ## How it works
 
 1. Bridge starts on your machine, prints QR + LAN URL
-2. Scan QR on phone → Safari opens with token prefilled
-3. Upload files, paste text, or share directly from any iOS app (PWA)
+2. Scan QR on phone or tablet → mobile browser opens with token prefilled
+3. Upload files, paste text, or share directly from any app (PWA)
 4. Agent calls tools to read, process, delete files
 
 ---
@@ -20,8 +20,8 @@ Scan a QR, open the page, upload files or paste text. Agent reads them instantly
 ```
 bridge/hermes_phone_bridge.py   FastAPI server, all API endpoints
 mcp/phone_link_server.py        MCP server (Claude Code, Cursor, Windsurf, Continue)
-plugin/ios_phone/               Hermes plugin (same 11 tools)
-web/                            Safari UI (PWA, Share Target, dark theme)
+plugin/phone/                   Hermes plugin (same 11 tools)
+web/                            Mobile browser UI (PWA, Share Target, dark theme)
 data/                           Persisted uploads + state (gitignored)
 ```
 
@@ -70,9 +70,9 @@ MCP server auto-starts the bridge on first use. QR code is returned inline in th
 ## Hermes plugin setup
 
 ```bash
-mkdir -p ~/.hermes/plugins/ios_phone
-cp plugin/ios_phone/*.py plugin/ios_phone/*.yaml ~/.hermes/plugins/ios_phone/
-hermes plugins enable ios_phone
+mkdir -p ~/.hermes/plugins/phone
+cp plugin/phone/*.py plugin/phone/*.yaml ~/.hermes/plugins/phone/
+hermes plugins enable phone
 ```
 
 ---
@@ -81,17 +81,17 @@ hermes plugins enable ios_phone
 
 | Tool | What it does |
 |------|-------------|
-| `ios_phone_begin_upload` | Start upload flow — returns QR art + URL + baseline for wait |
-| `ios_phone_link` | Get upload URL only |
-| `ios_phone_wait_for_files` | Block until new files arrive (uses baseline to skip old ones) |
-| `ios_phone_status` | Bridge + device connection status |
-| `ios_phone_list_files` | List all uploaded files |
-| `ios_phone_read_file` | Read file by id — text returns UTF-8, small binary returns base64, large binary (>100 KB) returns `storage_path` |
-| `ios_phone_read_latest_file` | Read most recent upload without needing an id |
-| `ios_phone_create_zip` | Bundle all uploads into a ZIP |
-| `ios_phone_summary` | Human-friendly status + suggested next tool |
-| `ios_phone_send_text` | Send a message from agent → phone display |
-| `ios_phone_delete_file` | Delete uploaded file by id |
+| `phone_begin_upload` | Start upload flow — returns QR art + URL + baseline for wait |
+| `phone_link` | Get upload URL only |
+| `phone_wait_for_files` | Block until new files arrive (uses baseline to skip old ones) |
+| `phone_status` | Bridge + device connection status |
+| `phone_list_files` | List all uploaded files |
+| `phone_read_file` | Read file by id — text returns UTF-8, small binary returns base64, large binary (>100 KB) returns `storage_path` |
+| `phone_read_latest_file` | Read most recent upload without needing an id |
+| `phone_create_zip` | Bundle all uploads into a ZIP |
+| `phone_summary` | Human-friendly status + suggested next tool |
+| `phone_send_text` | Send a message from agent → phone display |
+| `phone_delete_file` | Delete uploaded file by id |
 
 ---
 
@@ -100,11 +100,11 @@ hermes plugins enable ios_phone
 ```
 User: "I want to send files from my phone"
 
-1. ios_phone_begin_upload       → show QR + URL to user
+1. phone_begin_upload       → show QR + URL to user
 2. user scans QR, uploads files
-3. ios_phone_wait_for_files     → block until files arrive (pass baseline from step 1)
-4. ios_phone_read_latest_file   → read content
-5. ios_phone_delete_file        → clean up after processing
+3. phone_wait_for_files     → block until files arrive (pass baseline from step 1)
+4. phone_read_latest_file   → read content
+5. phone_delete_file        → clean up after processing
 ```
 
 ---
@@ -115,8 +115,8 @@ User: "I want to send files from my phone"
 - Text paste → saved as `.txt`
 - Create ZIP bundle
 - Per-file delete
-- **PWA**: Add to Home Screen in Safari → standalone app icon
-- **Web Share Target** (iOS 16.4+): share files directly from Photos, Files, or any app → Phone Portal
+- **PWA**: Add to Home Screen in your mobile browser → standalone app icon
+- **Web Share Target** (Android Chrome, mobile browsers with share target support): share files directly from Photos, Files, or any app → Phone Portal
 - Messages from agent displayed in "From Agent" section
 - 6 collapsible sections, dark theme, 560 px max-width layout
 

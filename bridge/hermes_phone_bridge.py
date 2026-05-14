@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Phone Link bridge.
 
-FastAPI backend for iPhone/iPad Safari uploads.
+FastAPI backend for phone or tablet mobile browser uploads.
 Frontend assets live under web/.
 """
 
@@ -34,7 +34,7 @@ from qrcode.image.svg import SvgPathImage
 
 MAX_UPLOAD_BYTES = 5_000_000
 BINARY_INLINE_MAX_BYTES = 100_000
-DEFAULT_WEB_DEVICE_NAME = "Safari Companion"
+DEFAULT_WEB_DEVICE_NAME = "Mobile Companion"
 BASE_DIR = Path(__file__).resolve().parent.parent
 WEB_DIR = BASE_DIR / "web"
 STATIC_DIR = WEB_DIR / "static"
@@ -666,7 +666,7 @@ def agent_begin_upload() -> dict[str, Any]:
         "url": STATE.public_url,
         "qr_path": "/qr.svg",
         "instructions": [
-            "Open the exact http:// URL on iPhone/iPad Safari.",
+            "Open the exact http:// URL on your phone or tablet mobile browser.",
             "Upload files or paste text.",
             "Return to your agent after upload, or let Hermes wait for new files.",
         ],

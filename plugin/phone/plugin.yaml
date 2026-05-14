@@ -1,0 +1,15 @@
+name: phone
+version: 0.1.0
+description: Connect Hermes to a FastAPI phone or tablet web bridge for user-selected file access
+provides_tools:
+  - phone_begin_upload
+  - phone_link
+  - phone_wait_for_files
+  - phone_read_latest_file
+  - phone_status
+  - phone_list_files
+  - phone_read_file
+  - phone_summary
+  - phone_create_zip
+  - phone_send_text
+  - phone_delete_file

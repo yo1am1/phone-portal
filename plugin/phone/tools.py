@@ -1,4 +1,4 @@
-"""Tool handlers for the Hermes iOS phone plugin."""
+"""Tool handlers for the Hermes phone plugin."""
 
 from __future__ import annotations
 
@@ -60,7 +60,7 @@ def _agent_files_query(since_count: int = 0, since_uploaded_at: float = 0.0) -> 
     return f"/api/agent/files?{query}"
 
 
-def ios_phone_begin_upload(args: dict, **kwargs) -> str:
+def phone_begin_upload(args: dict, **kwargs) -> str:
     """One-shot start for the smartphone upload flow."""
     payload = _json_request("GET", "/api/agent/begin_upload")
     if not payload.get("ok"):
@@ -87,7 +87,7 @@ def ios_phone_begin_upload(args: dict, **kwargs) -> str:
     )
 
 
-def ios_phone_link(args: dict, **kwargs) -> str:
+def phone_link(args: dict, **kwargs) -> str:
     """Return the exact phone-upload link and short instructions."""
     meta = _json_request("GET", "/api/meta")
     if not meta.get("ok"):
@@ -97,7 +97,7 @@ def ios_phone_link(args: dict, **kwargs) -> str:
             "ok": True,
             "url": meta.get("public_url"),
             "instructions": [
-                "Open the exact http:// URL on iPhone/iPad Safari.",
+                "Open the exact http:// URL on your phone or tablet mobile browser.",
                 "Upload files or paste text.",
                 "Then ask Hermes to wait for files or read the latest file.",
             ],
@@ -106,7 +106,7 @@ def ios_phone_link(args: dict, **kwargs) -> str:
     )
 
 
-def ios_phone_wait_for_files(args: dict, **kwargs) -> str:
+def phone_wait_for_files(args: dict, **kwargs) -> str:
     """Poll until new phone files exist, then return the current file list."""
     timeout_seconds = max(1, min(int(args.get("timeout_seconds") or 120), 900))
     poll_interval_seconds = max(1, min(int(args.get("poll_interval_seconds") or 2), 30))
@@ -140,17 +140,17 @@ def ios_phone_wait_for_files(args: dict, **kwargs) -> str:
     )
 
 
-def ios_phone_status(args: dict, **kwargs) -> str:
+def phone_status(args: dict, **kwargs) -> str:
     """Return bridge and phone connection status."""
     return json.dumps(_json_request("GET", "/api/agent/status"), ensure_ascii=False)
 
 
-def ios_phone_list_files(args: dict, **kwargs) -> str:
-    """List files the user selected in the iPhone/iPad web companion."""
+def phone_list_files(args: dict, **kwargs) -> str:
+    """List files the user selected in the phone or tablet web companion."""
     return json.dumps(_json_request("GET", _agent_files_query()), ensure_ascii=False)
 
 
-def ios_phone_read_file(args: dict, **kwargs) -> str:
+def phone_read_file(args: dict, **kwargs) -> str:
     """Ask the bridge to read a selected file."""
     file_id = str(args.get("file_id") or "").strip()
     if not file_id:
@@ -168,7 +168,7 @@ def ios_phone_read_file(args: dict, **kwargs) -> str:
     return json.dumps(result, ensure_ascii=False)
 
 
-def ios_phone_read_latest_file(args: dict, **kwargs) -> str:
+def phone_read_latest_file(args: dict, **kwargs) -> str:
     """Read the most recently uploaded phone file."""
     max_bytes = int(args.get("max_bytes") or 200_000)
     files = _json_request("GET", _agent_files_query())
@@ -194,8 +194,7 @@ def ios_phone_read_latest_file(args: dict, **kwargs) -> str:
     )
 
 
-
-def ios_phone_summary(args: dict, **kwargs) -> str:
+def phone_summary(args: dict, **kwargs) -> str:
     """Return a human-friendly summary for the agent."""
     status = _json_request("GET", "/api/agent/status")
     if not status.get("ok"):
@@ -211,12 +210,12 @@ def ios_phone_summary(args: dict, **kwargs) -> str:
         "device": device,
         "file_count": status.get("file_count", 0),
         "latest_file": latest,
-        "suggested_next": "ios_phone_read_latest_file" if latest else "ios_phone_begin_upload",
+        "suggested_next": "phone_read_latest_file" if latest else "phone_begin_upload",
     }
     return json.dumps(summary, ensure_ascii=False)
 
 
-def ios_phone_create_zip(args: dict, **kwargs) -> str:
+def phone_create_zip(args: dict, **kwargs) -> str:
     """Create a zip bundle from current uploaded files."""
     name = str(args.get("name") or "").strip()
     payload = {"name": name} if name else {}
@@ -224,7 +223,7 @@ def ios_phone_create_zip(args: dict, **kwargs) -> str:
     return json.dumps(result, ensure_ascii=False)
 
 
-def ios_phone_send_text(args: dict, **kwargs) -> str:
+def phone_send_text(args: dict, **kwargs) -> str:
     """Send text from agent to the phone display."""
     text = str(args.get("text") or "").strip()
     if not text:
@@ -237,7 +236,7 @@ def ios_phone_send_text(args: dict, **kwargs) -> str:
     return json.dumps(_json_request("POST", "/api/agent/send_text", payload), ensure_ascii=False)
 
 
-def ios_phone_delete_file(args: dict, **kwargs) -> str:
+def phone_delete_file(args: dict, **kwargs) -> str:
     """Delete an uploaded file by id."""
     file_id = str(args.get("file_id") or "").strip()
     if not file_id:

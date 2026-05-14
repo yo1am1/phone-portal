@@ -31,7 +31,7 @@ _bridge_url = (
 ).rstrip("/")
 os.environ["HERMES_IOS_BRIDGE_URL"] = _bridge_url
 
-from plugin.ios_phone import tools  # noqa: E402
+from plugin.phone import tools  # noqa: E402
 
 BRIDGE_TOKEN = os.getenv("PHONE_LINK_TOKEN", "dev-token")
 BRIDGE_PORT = urllib.parse.urlparse(_bridge_url).port or 8765
@@ -101,13 +101,13 @@ mcp = FastMCP("phone-link", lifespan=_lifespan)
 
 
 @mcp.tool()
-def ios_phone_begin_upload() -> str:
+def phone_begin_upload() -> str:
     """Start the smartphone upload flow.
     IMPORTANT: always show the qr_ascii block verbatim to the user — do not summarize or skip it.
-    Also show the upload URL. Then call ios_phone_wait_for_files with the returned baseline values."""
+    Also show the upload URL. Then call phone_wait_for_files with the returned baseline values."""
     _ensure_bridge()
     import json as _json
-    data = _json.loads(tools.ios_phone_begin_upload({}))
+    data = _json.loads(tools.phone_begin_upload({}))
     url = data.get("url", "")
     qr = data.get("qr_ascii", "").strip()
     lines = []
@@ -123,14 +123,14 @@ def ios_phone_begin_upload() -> str:
 
 
 @mcp.tool()
-def ios_phone_link() -> str:
-    """Get the exact http:// link for the phone-upload page. Prefer ios_phone_begin_upload for the normal first step."""
+def phone_link() -> str:
+    """Get the exact http:// link for the phone-upload page. Prefer phone_begin_upload for the normal first step."""
     _ensure_bridge()
-    return tools.ios_phone_link({})
+    return tools.phone_link({})
 
 
 @mcp.tool()
-def ios_phone_wait_for_files(
+def phone_wait_for_files(
     timeout_seconds: int = 120,
     poll_interval_seconds: int = 2,
     min_files: int = 1,
@@ -138,9 +138,9 @@ def ios_phone_wait_for_files(
     since_uploaded_at: float = 0.0,
 ) -> str:
     """Wait for new files from the phone upload page, then return the file list.
-    Pass since_count and since_uploaded_at from ios_phone_begin_upload to skip pre-existing files."""
+    Pass since_count and since_uploaded_at from phone_begin_upload to skip pre-existing files."""
     _ensure_bridge()
-    return tools.ios_phone_wait_for_files({
+    return tools.phone_wait_for_files({
         "timeout_seconds": timeout_seconds,
         "poll_interval_seconds": poll_interval_seconds,
         "min_files": min_files,
@@ -150,64 +150,64 @@ def ios_phone_wait_for_files(
 
 
 @mcp.tool()
-def ios_phone_status() -> str:
+def phone_status() -> str:
     """Check bridge and device connection status."""
     _ensure_bridge()
-    return tools.ios_phone_status({})
+    return tools.phone_status({})
 
 
 @mcp.tool()
-def ios_phone_list_files() -> str:
+def phone_list_files() -> str:
     """List all files uploaded from the phone."""
     _ensure_bridge()
-    return tools.ios_phone_list_files({})
+    return tools.phone_list_files({})
 
 
 @mcp.tool()
-def ios_phone_read_file(file_id: str, max_bytes: int = 200_000) -> str:
+def phone_read_file(file_id: str, max_bytes: int = 200_000) -> str:
     """Read a specific uploaded file by id.
     Text files: returns UTF-8 text.
     Small binary files (<=100 KB): returns base64.
     Large binary files (>100 KB, e.g. images): returns storage_path + read_hint instead of data.
       Use the Read tool directly on storage_path to view the file.
-    Get file_id from ios_phone_list_files."""
+    Get file_id from phone_list_files."""
     _ensure_bridge()
-    return tools.ios_phone_read_file({"file_id": file_id, "max_bytes": max_bytes})
+    return tools.phone_read_file({"file_id": file_id, "max_bytes": max_bytes})
 
 
 @mcp.tool()
-def ios_phone_read_latest_file(max_bytes: int = 200_000) -> str:
+def phone_read_latest_file(max_bytes: int = 200_000) -> str:
     """Read the most recently uploaded phone file without needing a file_id."""
     _ensure_bridge()
-    return tools.ios_phone_read_latest_file({"max_bytes": max_bytes})
+    return tools.phone_read_latest_file({"max_bytes": max_bytes})
 
 
 @mcp.tool()
-def ios_phone_summary() -> str:
+def phone_summary() -> str:
     """Return a human-friendly summary of bridge status, latest file, and suggested next tool."""
     _ensure_bridge()
-    return tools.ios_phone_summary({})
+    return tools.phone_summary({})
 
 
 @mcp.tool()
-def ios_phone_create_zip(name: str = "") -> str:
+def phone_create_zip(name: str = "") -> str:
     """Create a zip bundle from all currently uploaded files."""
     _ensure_bridge()
-    return tools.ios_phone_create_zip({"name": name})
+    return tools.phone_create_zip({"name": name})
 
 
 @mcp.tool()
-def ios_phone_send_text(text: str, title: str = "") -> str:
+def phone_send_text(text: str, title: str = "") -> str:
     """Send a text message from the agent to the phone display."""
     _ensure_bridge()
-    return tools.ios_phone_send_text({"text": text, "title": title})
+    return tools.phone_send_text({"text": text, "title": title})
 
 
 @mcp.tool()
-def ios_phone_delete_file(file_id: str) -> str:
+def phone_delete_file(file_id: str) -> str:
     """Delete an uploaded file by id. Use after processing to free space."""
     _ensure_bridge()
-    return tools.ios_phone_delete_file({"file_id": file_id})
+    return tools.phone_delete_file({"file_id": file_id})
 
 
 if __name__ == "__main__":

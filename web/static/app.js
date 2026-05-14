@@ -48,8 +48,8 @@ const MSG_POLL_INTERVAL = 6000;
 
 // ── State ──
 const params = new URLSearchParams(window.location.search);
-const sessionId = localStorage.getItem('hermesPhoneLinkSession') || makeSessionId();
-localStorage.setItem('hermesPhoneLinkSession', sessionId);
+const sessionId = localStorage.getItem('phoneLinkSession') || localStorage.getItem('hermesPhoneLinkSession') || makeSessionId();
+localStorage.setItem('phoneLinkSession', sessionId);
 
 let isConnected = false;
 let messagePollerTimer = null;
@@ -339,7 +339,7 @@ async function uploadFiles() {
   uploadStatusEl.textContent = `Uploaded ${files.length} file(s).`;
   uploadStatusEl.className = 'status-text ok';
   filesInputEl.value = '';
-  fileDropHintEl.textContent = 'Choose files from Files / iCloud / On My iPhone';
+  fileDropHintEl.textContent = 'Choose files from Files / iCloud / On My Device';
   uploadBtn.disabled = true;
   await refreshStatus();
   if (files.length > 1) await createZip();
@@ -467,7 +467,7 @@ function renderMessages() {
 // ── Webhook ──
 async function saveWebhook() {
   const url = (webhookUrlEl.value || '').trim();
-  localStorage.setItem('hermesPhoneLinkWebhook', url);
+  localStorage.setItem('phoneLinkWebhook', url);
   if (!url) {
     webhookStatusEl.textContent = 'Webhook cleared.';
     webhookStatusEl.className = 'status-text muted';
@@ -501,12 +501,12 @@ function handleShareLanding() {
 
 // ── Init ──
 function loadStoredValues() {
-  const storedToken = params.get('token') || localStorage.getItem('hermesPhoneLinkToken') || '';
+  const storedToken = params.get('token') || localStorage.getItem('phoneLinkToken') || localStorage.getItem('hermesPhoneLinkToken') || '';
   if (storedToken) {
     tokenEl.value = storedToken;
-    localStorage.setItem('hermesPhoneLinkToken', storedToken);
+    localStorage.setItem('phoneLinkToken', storedToken);
   }
-  const storedWebhook = localStorage.getItem('hermesPhoneLinkWebhook') || '';
+  const storedWebhook = localStorage.getItem('phoneLinkWebhook') || localStorage.getItem('hermesPhoneLinkWebhook') || '';
   if (storedWebhook) webhookUrlEl.value = storedWebhook;
 }
 
@@ -522,7 +522,7 @@ filesInputEl.addEventListener('change', () => {
     uploadStatusEl.textContent = count + ' file(s) ready to upload.';
     uploadStatusEl.className = 'status-text ok';
   } else {
-    fileDropHintEl.textContent = 'Choose files from Files / iCloud / On My iPhone';
+    fileDropHintEl.textContent = 'Choose files from Files / iCloud / On My Device';
     uploadBtn.disabled = true;
     uploadStatusEl.textContent = 'No files selected.';
     uploadStatusEl.className = 'status-text muted';
@@ -543,7 +543,7 @@ copyLinkBtn.addEventListener('click', async () => {
 saveTokenBtn.addEventListener('click', async () => {
   try {
     setBusy(saveTokenBtn, 'Connecting…');
-    localStorage.setItem('hermesPhoneLinkToken', tokenEl.value);
+    localStorage.setItem('phoneLinkToken', tokenEl.value);
     await refreshStatus();
   } catch (err) {
     connectStatusEl.textContent = 'Connection failed: ' + err.message;

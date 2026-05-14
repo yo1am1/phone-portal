@@ -1,7 +1,7 @@
-"""Schemas for the Hermes iOS phone plugin."""
+"""Schemas for the Hermes phone plugin."""
 
-IOS_PHONE_BEGIN_UPLOAD = {
-    "name": "ios_phone_begin_upload",
+PHONE_BEGIN_UPLOAD = {
+    "name": "phone_begin_upload",
     "description": (
         "Start the smartphone upload flow in one step. Returns the exact http:// link, QR path, "
         "short instructions, and current file baseline so Hermes can wait for new files."
@@ -9,20 +9,20 @@ IOS_PHONE_BEGIN_UPLOAD = {
     "parameters": {"type": "object", "properties": {}},
 }
 
-IOS_PHONE_LINK = {
-    "name": "ios_phone_link",
+PHONE_LINK = {
+    "name": "phone_link",
     "description": (
-        "Get the exact http:// link for the current phone-upload page so the user can open it on iPhone/iPad. "
-        "Prefer ios_phone_begin_upload for the normal first step because it also returns the baseline needed to wait for only new uploads."
+        "Get the exact http:// link for the current phone-upload page so the user can open it on their phone or tablet. "
+        "Prefer phone_begin_upload for the normal first step because it also returns the baseline needed to wait for only new uploads."
     ),
     "parameters": {"type": "object", "properties": {}},
 }
 
-IOS_PHONE_WAIT_FOR_FILES = {
-    "name": "ios_phone_wait_for_files",
+PHONE_WAIT_FOR_FILES = {
+    "name": "phone_wait_for_files",
     "description": (
         "Wait for new files to appear from the phone upload page, then return the current uploaded file list. "
-        "Pass since_count or since_uploaded_at from ios_phone_begin_upload to avoid returning old files."
+        "Pass since_count or since_uploaded_at from phone_begin_upload to avoid returning old files."
     ),
     "parameters": {
         "type": "object",
@@ -41,18 +41,18 @@ IOS_PHONE_WAIT_FOR_FILES = {
             },
             "since_count": {
                 "type": "integer",
-                "description": "Existing file count baseline. Usually from ios_phone_begin_upload.",
+                "description": "Existing file count baseline. Usually from phone_begin_upload.",
             },
             "since_uploaded_at": {
                 "type": "number",
-                "description": "Timestamp baseline. Usually latest_uploaded_at from ios_phone_begin_upload.",
+                "description": "Timestamp baseline. Usually latest_uploaded_at from phone_begin_upload.",
             }
         },
     },
 }
 
-IOS_PHONE_READ_LATEST_FILE = {
-    "name": "ios_phone_read_latest_file",
+PHONE_READ_LATEST_FILE = {
+    "name": "phone_read_latest_file",
     "description": (
         "Read the most recently uploaded phone file without asking for a file_id. "
         "Use this when the user uploaded one obvious file and wants you to use it immediately."
@@ -68,26 +68,26 @@ IOS_PHONE_READ_LATEST_FILE = {
     },
 }
 
-IOS_PHONE_STATUS = {
-    "name": "ios_phone_status",
-    "description": "Check whether the local Hermes iPhone/iPad web bridge has a remembered or active Safari companion session.",
+PHONE_STATUS = {
+    "name": "phone_status",
+    "description": "Check whether the local Hermes phone or tablet web bridge has a remembered or active mobile browser companion session.",
     "parameters": {"type": "object", "properties": {}},
 }
 
-IOS_PHONE_LIST_FILES = {
-    "name": "ios_phone_list_files",
+PHONE_LIST_FILES = {
+    "name": "phone_list_files",
     "description": (
-        "List files explicitly selected by the user in the paired iPhone/iPad web companion. "
+        "List files explicitly selected by the user in the paired phone or tablet web companion. "
         "Use this before reading a specific file by id, or when multiple files were uploaded."
     ),
     "parameters": {"type": "object", "properties": {}},
 }
 
-IOS_PHONE_READ_FILE = {
-    "name": "ios_phone_read_file",
+PHONE_READ_FILE = {
+    "name": "phone_read_file",
     "description": (
-        "Read a user-selected file from the paired iPhone/iPad session by file id. "
-        "The file id comes from ios_phone_list_files. Returns UTF-8 text when possible, "
+        "Read a user-selected file from the paired phone or tablet session by file id. "
+        "The file id comes from phone_list_files. Returns UTF-8 text when possible, "
         "otherwise returns base64 with metadata."
     ),
     "parameters": {
@@ -95,7 +95,7 @@ IOS_PHONE_READ_FILE = {
         "properties": {
             "file_id": {
                 "type": "string",
-                "description": "File identifier returned by ios_phone_list_files.",
+                "description": "File identifier returned by phone_list_files.",
             },
             "max_bytes": {
                 "type": "integer",
@@ -107,14 +107,14 @@ IOS_PHONE_READ_FILE = {
 }
 
 
-IOS_PHONE_SUMMARY = {
-    "name": "ios_phone_summary",
+PHONE_SUMMARY = {
+    "name": "phone_summary",
     "description": "Return a human-friendly summary of the phone bridge status, latest file, and suggested next tool call.",
     "parameters": {"type": "object", "properties": {}},
 }
 
-IOS_PHONE_CREATE_ZIP = {
-    "name": "ios_phone_create_zip",
+PHONE_CREATE_ZIP = {
+    "name": "phone_create_zip",
     "description": "Create a zip bundle from all currently uploaded files.",
     "parameters": {
         "type": "object",
@@ -127,8 +127,8 @@ IOS_PHONE_CREATE_ZIP = {
     },
 }
 
-IOS_PHONE_SEND_TEXT = {
-    "name": "ios_phone_send_text",
+PHONE_SEND_TEXT = {
+    "name": "phone_send_text",
     "description": "Send a text message from the agent to the phone display. The phone will show it in a 'From Agent' section.",
     "parameters": {
         "type": "object",
@@ -140,13 +140,13 @@ IOS_PHONE_SEND_TEXT = {
     },
 }
 
-IOS_PHONE_DELETE_FILE = {
-    "name": "ios_phone_delete_file",
+PHONE_DELETE_FILE = {
+    "name": "phone_delete_file",
     "description": "Delete an uploaded file by id. Use after reading a file to free up space.",
     "parameters": {
         "type": "object",
         "properties": {
-            "file_id": {"type": "string", "description": "File id from ios_phone_list_files."},
+            "file_id": {"type": "string", "description": "File id from phone_list_files."},
         },
         "required": ["file_id"],
     },
