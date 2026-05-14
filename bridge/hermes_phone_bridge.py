@@ -11,6 +11,7 @@ import argparse
 import base64
 import io
 import json
+import os
 import secrets
 import socket
 import subprocess
@@ -44,14 +45,24 @@ UPLOADS_DIR = DATA_DIR / "uploads"
 STATE_FILE = DATA_DIR / "state.json"
 
 
+def _resolve_storage_path(storage_path: str) -> Path | None:
+    """Resolve stored path (relative filename or legacy absolute path) to absolute Path."""
+    if not storage_path:
+        return None
+    p = Path(storage_path)
+    if p.is_absolute():
+        return p  # backward compat: old state.json entries
+    return UPLOADS_DIR / p
+
+
 @dataclass
 class DeviceState:
     device_id: str
     name: str
     files: list[dict[str, Any]] = field(default_factory=list)
-    uploaded_data: dict[str, bytes] = field(default_factory=dict)
     last_seen: float = field(default_factory=time.time)
     outbox: list[dict[str, Any]] = field(default_factory=list)
+    # uploaded_data removed — files read from disk on demand to prevent memory leak
 
 
 class BridgeState:
@@ -70,6 +81,7 @@ class BridgeState:
         self.token_created_at = time.time()
         self.webhook_url = webhook_url
         self.devices: dict[str, DeviceState] = {}
+        self._lock = threading.RLock()
         DATA_DIR.mkdir(parents=True, exist_ok=True)
         UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
         self._load_from_disk()
@@ -107,49 +119,50 @@ class BridgeState:
         return max(self.devices.values(), key=lambda d: d.last_seen)
 
     def get_or_create_web_device(self, session_id: str) -> DeviceState:
-        device_id = f"web-{session_id}"
-        device = self.devices.get(device_id)
-        if device is None:
-            device = DeviceState(device_id=device_id, name=DEFAULT_WEB_DEVICE_NAME)
-            self.devices[device_id] = device
-        device.last_seen = time.time()
-        self._save_to_disk()
-        return device
+        with self._lock:
+            device_id = f"web-{session_id}"
+            device = self.devices.get(device_id)
+            if device is None:
+                device = DeviceState(device_id=device_id, name=DEFAULT_WEB_DEVICE_NAME)
+                self.devices[device_id] = device
+            device.last_seen = time.time()
+            self._save_to_disk()
+            return device
 
     def upsert_file(self, device: DeviceState, *, name: str, mime_type: str, data: bytes) -> dict[str, Any]:
-        now = time.time()
-        file_id = secrets.token_hex(10)
-        ext = Path(name).suffix.lower() or ".bin"
-        file_path = UPLOADS_DIR / f"{file_id}{ext}"
-        file_path.write_bytes(data)
-        meta = {
-            "id": file_id,
-            "name": name,
-            "size": len(data),
-            "type": mime_type,
-            "uploaded_at": now,
-            "storage_path": str(file_path),
-        }
-        device.uploaded_data[file_id] = data
-        device.files = [item for item in device.files if item.get("name") != name]
-        device.files.append(meta)
-        device.files.sort(key=lambda item: float(item.get("uploaded_at") or 0.0))
-        device.last_seen = now
-        self._save_to_disk()
-        return meta
+        with self._lock:
+            now = time.time()
+            file_id = secrets.token_hex(10)
+            ext = Path(name).suffix.lower() or ".bin"
+            file_path = UPLOADS_DIR / f"{file_id}{ext}"
+            file_path.write_bytes(data)
+            meta = {
+                "id": file_id,
+                "name": name,
+                "size": len(data),
+                "type": mime_type,
+                "uploaded_at": now,
+                "storage_path": file_path.name,  # relative: filename only, no absolute path
+            }
+            device.files = [item for item in device.files if item.get("name") != name]
+            device.files.append(meta)
+            device.files.sort(key=lambda item: float(item.get("uploaded_at") or 0.0))
+            device.last_seen = now
+            self._save_to_disk()
+            return meta
 
     def clear_device(self, device: DeviceState) -> None:
-        for item in device.files:
-            storage_path = item.get("storage_path")
-            if storage_path:
-                try:
-                    Path(storage_path).unlink(missing_ok=True)
-                except Exception:
-                    pass
-        device.files = []
-        device.uploaded_data = {}
-        device.last_seen = time.time()
-        self._save_to_disk()
+        with self._lock:
+            for item in device.files:
+                path = _resolve_storage_path(item.get("storage_path", ""))
+                if path:
+                    try:
+                        path.unlink(missing_ok=True)
+                    except Exception:
+                        pass
+            device.files = []
+            device.last_seen = time.time()
+            self._save_to_disk()
 
     def fire_webhook(self, event: str, payload: dict) -> None:
         if not self.webhook_url:
@@ -173,8 +186,12 @@ class BridgeState:
         if not STATE_FILE.exists():
             return
         try:
-            payload = json.loads(STATE_FILE.read_text())
-        except Exception:
+            raw = STATE_FILE.read_text().strip()
+            if not raw:
+                return
+            payload = json.loads(raw)
+        except Exception as exc:
+            print(f"[bridge] Warning: could not load state.json: {exc}", flush=True)
             return
         for raw_device in payload.get("devices", []):
             device = DeviceState(
@@ -186,21 +203,22 @@ class BridgeState:
                 storage_path = item.get("storage_path")
                 if not storage_path:
                     continue
-                path = Path(storage_path)
-                if not path.exists():
+                path = _resolve_storage_path(storage_path)
+                if not path or not path.exists():
                     continue
                 try:
-                    data = path.read_bytes()
+                    size = path.stat().st_size
                 except Exception:
                     continue
                 item = dict(item)
-                item["size"] = len(data)
+                item["size"] = size
+                item["storage_path"] = path.name  # normalise to relative on load
                 device.files.append(item)
-                device.uploaded_data[item["id"]] = data
             device.files.sort(key=lambda entry: float(entry.get("uploaded_at") or 0.0))
             self.devices[device.device_id] = device
 
     def _save_to_disk(self) -> None:
+        """Atomic write via temp file + os.replace to prevent partial writes on crash."""
         payload = {
             "devices": [
                 {
@@ -212,7 +230,9 @@ class BridgeState:
                 for device in self.devices.values()
             ]
         }
-        STATE_FILE.write_text(json.dumps(payload, indent=2))
+        tmp = STATE_FILE.with_suffix(".tmp")
+        tmp.write_text(json.dumps(payload, indent=2))
+        os.replace(tmp, STATE_FILE)
 
 
 class WebBase(BaseModel):
@@ -341,13 +361,6 @@ def print_terminal_qr(data: str) -> None:
     print(buf.getvalue())
 
 
-def text_or_base64(data: bytes) -> dict[str, Any]:
-    try:
-        return {"encoding": "utf8", "text": data.decode("utf-8")}
-    except UnicodeDecodeError:
-        return {"encoding": "base64", "base64": base64.b64encode(data).decode("ascii")}
-
-
 def current_summary(device: DeviceState | None) -> dict[str, Any]:
     if not device:
         return {"connected": False, "device": None, "files": [], "file_count": 0}
@@ -373,13 +386,15 @@ def create_zip_for_device(device: DeviceState, name: str | None = None) -> dict[
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as zf:
         for item in device.files:
-            file_id = item.get("id")
-            if not file_id:
+            storage_path = item.get("storage_path", "")
+            path = _resolve_storage_path(storage_path)
+            if not path or not path.exists():
                 continue
-            data = device.uploaded_data.get(file_id)
-            if data is None:
+            try:
+                data = path.read_bytes()
+            except Exception:
                 continue
-            arcname = item.get("name") or file_id
+            arcname = item.get("name") or item.get("id", "file")
             zf.writestr(arcname, data)
     data = buffer.getvalue()
     return {"ok": True, "file": STATE.upsert_file(device, name=zip_name, mime_type="application/zip", data=data)}
@@ -389,13 +404,23 @@ def handle_local_read(device: DeviceState, args: dict[str, Any]) -> dict[str, An
     file_id = str(args.get("file_id") or "").strip()
     if not file_id:
         return {"ok": False, "error": "file_id is required"}
-    if file_id not in device.uploaded_data:
+
+    meta = next((f for f in device.files if f.get("id") == file_id), None)
+    if meta is None:
         return {"ok": False, "error": "file not found"}
 
-    data = device.uploaded_data[file_id]
+    storage_path_str = meta.get("storage_path", "")
+    path = _resolve_storage_path(storage_path_str)
+    if not path or not path.exists():
+        return {"ok": False, "error": "file data not found on disk"}
+
+    try:
+        data = path.read_bytes()
+    except Exception as exc:
+        return {"ok": False, "error": f"could not read file: {exc}"}
+
     max_bytes = max(1, min(int(args.get("max_bytes") or 200_000), 2_000_000))
-    meta = next((f for f in device.files if f.get("id") == file_id), {"id": file_id, "name": file_id, "size": len(data)})
-    storage_path = meta.get("storage_path", "")
+    abs_path = str(path)
 
     payload: dict[str, Any] = {
         "ok": True,
@@ -404,7 +429,7 @@ def handle_local_read(device: DeviceState, args: dict[str, Any]) -> dict[str, An
         "size": meta.get("size", len(data)),
         "type": meta.get("type"),
         "uploaded_at": meta.get("uploaded_at"),
-        "storage_path": storage_path,
+        "storage_path": abs_path,
     }
 
     try:
@@ -424,10 +449,25 @@ def handle_local_read(device: DeviceState, args: dict[str, Any]) -> dict[str, An
         payload["inline"] = False
         payload["read_hint"] = (
             f"Binary file too large to inline ({len(data):,} bytes). "
-            f"Use the Read tool directly on storage_path: {storage_path}"
+            f"Use the Read tool directly on storage_path: {abs_path}"
         )
 
     return payload
+
+
+def _delete_file_from_device(device: DeviceState, file_id: str) -> bool:
+    """Remove file from device.files and disk. Returns True if found."""
+    target = next((f for f in device.files if f.get("id") == file_id), None)
+    if not target:
+        return False
+    path = _resolve_storage_path(target.get("storage_path", ""))
+    if path:
+        try:
+            path.unlink(missing_ok=True)
+        except Exception:
+            pass
+    device.files = [f for f in device.files if f.get("id") != file_id]
+    return True
 
 
 def require_token(token: str, request: Request) -> None:
@@ -601,9 +641,9 @@ def web_set_webhook(body: SetWebhookBody, request: Request) -> dict[str, Any]:
 def web_messages(body: WebBase, request: Request) -> dict[str, Any]:
     require_token(body.token, request)
     device = STATE.get_or_create_web_device(body.session_id)
-    messages = list(device.outbox)
-    device.outbox = []
-    STATE._save_to_disk()
+    with STATE._lock:
+        messages = list(device.outbox)
+        device.outbox = []
     return {"ok": True, "messages": messages}
 
 
@@ -612,18 +652,11 @@ def web_delete_file(body: DeleteFileBody, request: Request) -> dict[str, Any]:
     if not STATE.authenticate(body.token):
         raise HTTPException(status_code=401, detail="bad token")
     device = STATE.get_or_create_web_device(body.session_id)
-    target = next((f for f in device.files if f.get("id") == body.file_id), None)
-    if not target:
-        raise HTTPException(status_code=404, detail="file not found")
-    storage_path = target.get("storage_path")
-    if storage_path:
-        try:
-            Path(storage_path).unlink(missing_ok=True)
-        except Exception:
-            pass
-    device.files = [f for f in device.files if f.get("id") != body.file_id]
-    device.uploaded_data.pop(body.file_id, None)
-    STATE._save_to_disk()
+    with STATE._lock:
+        found = _delete_file_from_device(device, body.file_id)
+        if not found:
+            raise HTTPException(status_code=404, detail="file not found")
+        STATE._save_to_disk()
     return {"ok": True, "deleted": body.file_id}
 
 
@@ -686,10 +719,6 @@ def agent_files(since_count: int = Query(default=0), since_uploaded_at: float = 
     if not device:
         return JSONResponse(status_code=404, content={"ok": False, "error": "no device connected"})
     files = device.files
-    # A file is "new" only if it is beyond both the count and timestamp baselines.
-    # Using AND ensures that callers can rely on since_count=N alone (with default
-    # since_uploaded_at=0.0) to mean "I already have N files; wait for more",
-    # without timestamp=0 admitting everything via the OR short-circuit.
     new_files = [
         item for idx, item in enumerate(files)
         if idx >= since_count and float(item.get("uploaded_at") or 0.0) > since_uploaded_at
@@ -719,18 +748,11 @@ def agent_command(body: AgentCommandBody) -> JSONResponse:
         file_id = str(body.args.get("file_id") or "").strip()
         if not file_id:
             return JSONResponse(content={"ok": False, "error": "file_id required"})
-        target = next((f for f in device.files if f.get("id") == file_id), None)
-        if not target:
-            return JSONResponse(content={"ok": False, "error": "file not found"})
-        storage_path = target.get("storage_path")
-        if storage_path:
-            try:
-                Path(storage_path).unlink(missing_ok=True)
-            except Exception:
-                pass
-        device.files = [f for f in device.files if f.get("id") != file_id]
-        device.uploaded_data.pop(file_id, None)
-        STATE._save_to_disk()
+        with STATE._lock:
+            found = _delete_file_from_device(device, file_id)
+            if not found:
+                return JSONResponse(content={"ok": False, "error": "file not found"})
+            STATE._save_to_disk()
         return JSONResponse(content={"ok": True, "deleted": file_id})
     return JSONResponse(status_code=400, content={"ok": False, "error": f"unsupported command: {body.name}"})
 
@@ -746,7 +768,8 @@ def agent_send_text(body: SendTextBody) -> dict[str, Any]:
         "text": body.text,
         "sent_at": time.time(),
     }
-    device.outbox.append(message)
+    with STATE._lock:
+        device.outbox.append(message)
     return {"ok": True, "message": message}
 
 

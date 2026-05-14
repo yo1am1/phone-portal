@@ -34,25 +34,37 @@ BRIDGE_URL = (
 ).rstrip("/")
 
 
-def _json_request(method: str, path: str, payload: dict[str, Any] | None = None, timeout: float = 35.0) -> dict[str, Any]:
+def _json_request(
+    method: str,
+    path: str,
+    payload: dict[str, Any] | None = None,
+    timeout: float = 35.0,
+    retries: int = 3,
+) -> dict[str, Any]:
     data = None if payload is None else json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(
-        f"{BRIDGE_URL}{path}",
-        data=data,
-        method=method,
-        headers={"Content-Type": "application/json"},
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 - local/configured bridge
-            return json.loads(resp.read().decode("utf-8"))
-    except urllib.error.HTTPError as e:
+    last_err: str = "unknown error"
+    for attempt in range(retries):
+        req = urllib.request.Request(
+            f"{BRIDGE_URL}{path}",
+            data=data,
+            method=method,
+            headers={"Content-Type": "application/json"},
+        )
         try:
-            detail = json.loads(e.read().decode("utf-8"))
-        except Exception:
-            detail = {"error": str(e)}
-        return {"ok": False, "status": e.code, **detail}
-    except Exception as e:
-        return {"ok": False, "error": f"bridge request failed: {e}", "bridge_url": BRIDGE_URL}
+            with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310
+                return json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            # HTTP errors (4xx/5xx) are deterministic — don't retry.
+            try:
+                detail = json.loads(e.read().decode("utf-8"))
+            except Exception:
+                detail = {"error": str(e)}
+            return {"ok": False, "status": e.code, **detail}
+        except Exception as e:
+            last_err = str(e)
+            if attempt < retries - 1:
+                time.sleep(0.5 * (attempt + 1))
+    return {"ok": False, "error": f"bridge request failed after {retries} attempts: {last_err}", "bridge_url": BRIDGE_URL}
 
 
 def _agent_files_query(since_count: int = 0, since_uploaded_at: float = 0.0) -> str:

@@ -44,6 +44,8 @@ RELAY_CMD = os.getenv("PHONE_LINK_RELAY_CMD", "")
 RELAY_SCRIPT = ROOT / "relay" / "example_relay.py"
 _relay_url = f"http://127.0.0.1:{RELAY_PORT}"
 
+BRIDGE_PID_FILE = ROOT / "data" / "bridge.pid"
+
 _bridge_proc: subprocess.Popen | None = None
 _relay_proc: subprocess.Popen | None = None
 _bridge_lock = threading.Lock()
@@ -66,8 +68,26 @@ def _relay_alive() -> bool:
         return False
 
 
+def _kill_orphan_bridge() -> None:
+    """Kill a leftover bridge process from a previous MCP session."""
+    if not BRIDGE_PID_FILE.exists():
+        return
+    try:
+        pid = int(BRIDGE_PID_FILE.read_text().strip())
+        os.kill(pid, 0)  # check if alive
+        # Process exists but bridge not healthy — kill it.
+        if not _alive():
+            os.kill(pid, 15)  # SIGTERM
+            time.sleep(1)
+    except (ProcessLookupError, ValueError, OSError):
+        pass
+    finally:
+        BRIDGE_PID_FILE.unlink(missing_ok=True)
+
+
 def _start_bridge() -> None:
     global _bridge_proc
+    BRIDGE_PID_FILE.parent.mkdir(parents=True, exist_ok=True)
     _bridge_proc = subprocess.Popen(
         [
             "uv", "run", "python", str(BRIDGE_SCRIPT),
@@ -80,6 +100,7 @@ def _start_bridge() -> None:
         stdout=sys.stderr,
         stderr=subprocess.DEVNULL,
     )
+    BRIDGE_PID_FILE.write_text(str(_bridge_proc.pid))
     deadline = time.monotonic() + 15
     while time.monotonic() < deadline:
         if _alive():
@@ -120,6 +141,7 @@ def _ensure_bridge() -> None:
     with _bridge_lock:
         if _alive():
             return
+        _kill_orphan_bridge()
         _start_bridge()
 
 
@@ -136,6 +158,7 @@ def _cleanup() -> None:
     for proc in (_bridge_proc, _relay_proc):
         if proc and proc.poll() is None:
             proc.terminate()
+    BRIDGE_PID_FILE.unlink(missing_ok=True)
 
 
 atexit.register(_cleanup)

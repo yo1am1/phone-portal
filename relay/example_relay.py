@@ -29,6 +29,7 @@ import shutil
 import subprocess
 import threading
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 BRIDGE_URL = os.getenv("PHONE_LINK_BRIDGE_URL", "http://127.0.0.1:8765").rstrip("/")
@@ -42,6 +43,7 @@ _CLI_PRESETS: dict[str, list[str]] = {
     "llm":    ["llm", "{prompt}"],
 }
 _AUTO_ORDER = ["claude", "gemini", "llm", "ollama"]
+_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="relay")
 
 # Set by main() from CLI args.
 _cli_preset: str = "claude"
@@ -215,7 +217,7 @@ class RelayHandler(BaseHTTPRequestHandler):
             self._respond(400, {"ok": False, "error": "prompt required"})
             return
         session_id = str(data.get("session_id") or "")
-        threading.Thread(target=handle_prompt, args=(prompt, session_id), daemon=True).start()
+        _executor.submit(handle_prompt, prompt, session_id)
         self._respond(202, {"ok": True, "status": "processing"})
 
     def _respond(self, code: int, payload: dict) -> None:
