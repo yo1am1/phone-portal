@@ -37,8 +37,14 @@ BRIDGE_TOKEN = os.getenv("PHONE_LINK_TOKEN", "dev-token")
 BRIDGE_PORT = urllib.parse.urlparse(_bridge_url).port or 8765
 BRIDGE_SCRIPT = ROOT / "bridge" / "hermes_phone_bridge.py"
 
+RELAY_PORT = int(os.getenv("PHONE_LINK_RELAY_PORT", "9001"))
+RELAY_SCRIPT = ROOT / "relay" / "example_relay.py"
+_relay_url = f"http://127.0.0.1:{RELAY_PORT}"
+
 _bridge_proc: subprocess.Popen | None = None
+_relay_proc: subprocess.Popen | None = None
 _bridge_lock = threading.Lock()
+_relay_lock = threading.Lock()
 
 
 def _alive() -> bool:
@@ -49,11 +55,16 @@ def _alive() -> bool:
         return False
 
 
+def _relay_alive() -> bool:
+    try:
+        with urllib.request.urlopen(f"{_relay_url}/health", timeout=2):
+            return True
+    except Exception:
+        return False
+
+
 def _start_bridge() -> None:
     global _bridge_proc
-    # stdout → MCP server's stderr so QR/startup prints reach the terminal
-    # without corrupting the MCP stdio protocol pipe on stdout.
-    # stderr → DEVNULL silences uvicorn request logs.
     _bridge_proc = subprocess.Popen(
         [
             "uv", "run", "python", str(BRIDGE_SCRIPT),
@@ -74,6 +85,27 @@ def _start_bridge() -> None:
     raise RuntimeError(f"Bridge did not start within 15 s (pid {_bridge_proc.pid})")
 
 
+def _start_relay() -> None:
+    global _relay_proc
+    _relay_proc = subprocess.Popen(
+        [
+            "uv", "run", "python", str(RELAY_SCRIPT),
+            "--port", str(RELAY_PORT),
+            "--bridge", _bridge_url,
+        ],
+        cwd=str(ROOT),
+        stdout=sys.stderr,
+        stderr=subprocess.DEVNULL,
+    )
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline:
+        if _relay_alive():
+            return
+        time.sleep(0.3)
+    # Relay failing is non-fatal — bridge still works without it.
+    print(f"[phone-portal] Relay did not start within 10 s (pid {_relay_proc.pid})", file=sys.stderr)
+
+
 def _ensure_bridge() -> None:
     if _alive():
         return
@@ -83,9 +115,19 @@ def _ensure_bridge() -> None:
         _start_bridge()
 
 
+def _ensure_relay() -> None:
+    if _relay_alive():
+        return
+    with _relay_lock:
+        if _relay_alive():
+            return
+        _start_relay()
+
+
 def _cleanup() -> None:
-    if _bridge_proc and _bridge_proc.poll() is None:
-        _bridge_proc.terminate()
+    for proc in (_bridge_proc, _relay_proc):
+        if proc and proc.poll() is None:
+            proc.terminate()
 
 
 atexit.register(_cleanup)
@@ -94,6 +136,7 @@ atexit.register(_cleanup)
 @asynccontextmanager
 async def _lifespan(server):
     _ensure_bridge()
+    _ensure_relay()
     yield
 
 
@@ -119,6 +162,13 @@ def phone_begin_upload() -> str:
     lines.append(f"existing_file_count: {data.get('existing_file_count', 0)}")
     lines.append(f"latest_uploaded_at: {data.get('latest_uploaded_at', 0.0)}")
     lines.append(f"connected: {data.get('connected', False)}")
+    if _relay_alive():
+        # Derive LAN IP from bridge URL so phone can reach relay too.
+        _parsed = urllib.parse.urlparse(url)
+        relay_url = f"http://{_parsed.hostname}:{RELAY_PORT}/prompt"
+        lines.append(f"\nPrompt relay running at: {relay_url}")
+        lines.append("In phone UI → Settings → Prompt Relay URL → set to the above URL (one-time setup).")
+        lines.append("After that, tapping a suggestion chip sends the prompt straight to the agent.")
     return "\n".join(lines)
 
 
