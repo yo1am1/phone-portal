@@ -47,7 +47,7 @@ step() { gum style --bold --foreground 99 "  ▌ $1"; }
 ok()   { gum style --foreground 2          "  ✓ $1"; }
 warn() { gum style --foreground 3          "  ⚠ $1"; }
 die()  { gum style --foreground 1 --bold   "  ✗ $1"; printf "\n"; exit 1; }
-run()  { local t="$1"; shift; gum spin --title "    $t" --spinner points -- "$@"; }
+run()  { local t="$1"; shift; gum spin --title "    $t" --spinner points -- "$@" 2>/dev/null; }
 
 # ── Preflight ─────────────────────────────────────────────────
 step "Checking requirements"
