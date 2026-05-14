@@ -3,15 +3,17 @@
 Send files from any phone or tablet to any AI agent. No native app required. FastAPI + mobile browser.
 
 Scan a QR, open the page, upload files or paste text. Agent reads them instantly.
+Tap a suggestion chip → prompt fires to your AI CLI automatically.
 
 ---
 
 ## How it works
 
-1. Bridge starts on your machine, prints QR + LAN URL
-2. Scan QR on phone or tablet → mobile browser opens with token prefilled
-3. Upload files, paste text, or share directly from any app (PWA)
-4. Agent calls tools to read, process, delete files
+1. Start Claude Code (or any MCP-compatible agent) — bridge + relay boot automatically
+2. Ask agent *"I want to send files from my phone"* → QR + URL appear inline
+3. Scan QR on phone → upload files, paste text, or share from any app (PWA)
+4. Agent reads, processes, deletes files via tools
+5. Tap a suggestion chip on the phone → prompt fires to your AI CLI → answer appears on phone
 
 ---
 
@@ -19,7 +21,8 @@ Scan a QR, open the page, upload files or paste text. Agent reads them instantly
 
 ```
 bridge/hermes_phone_bridge.py   FastAPI server, all API endpoints
-mcp/phone_link_server.py        MCP server (Claude Code, Cursor, Windsurf, Continue)
+mcp/phone_link_server.py        MCP server — auto-starts bridge + relay on launch
+relay/example_relay.py          Prompt relay — receives chip taps, runs AI CLI, replies to phone
 plugin/phone/                   Hermes plugin (same 11 tools)
 web/                            Mobile browser UI (PWA, Share Target, dark theme)
 data/                           Persisted uploads + state (gitignored)
@@ -27,26 +30,15 @@ data/                           Persisted uploads + state (gitignored)
 
 ---
 
-## Run the bridge
+## Quick start
 
 ```bash
+git clone https://github.com/yo1am1/phone-portal
+cd phone-portal
 uv sync
-uv run python bridge/hermes_phone_bridge.py \
-  --host 0.0.0.0 \
-  --port 8765 \
-  --token dev-token \
-  --token-ttl-seconds 900 \
-  --allow-subnet 192.168.0.0/16 \
-  --webhook-url http://127.0.0.1:9000/webhook   # optional
 ```
 
-Bridge prints QR in terminal and serves the UI on your LAN.
-
----
-
-## MCP setup (Claude Code / Cursor / Windsurf / Continue)
-
-`.mcp.json` is already in the repo root. Edit the env vars if needed:
+Add to your agent's MCP config (`.mcp.json` already included):
 
 ```json
 {
@@ -56,14 +48,88 @@ Bridge prints QR in terminal and serves the UI on your LAN.
       "args": ["run", "python", "mcp/phone_link_server.py"],
       "env": {
         "PHONE_LINK_TOKEN": "dev-token",
-        "PHONE_LINK_BRIDGE_URL": "http://127.0.0.1:8765"
+        "PHONE_LINK_BRIDGE_URL": "http://127.0.0.1:8765",
+        "PHONE_LINK_RELAY_PORT": "9001",
+        "PHONE_LINK_RELAY_CLI": "auto"
       }
     }
   }
 }
 ```
 
-MCP server auto-starts the bridge on first use. QR code is returned inline in the agent conversation.
+Start Claude Code — bridge and relay start automatically. Ask:
+> *"I want to send files from my phone"*
+
+Agent shows QR + relay URL. Scan QR on phone. Set relay URL in phone Settings once.
+
+---
+
+## MCP config reference
+
+| Env var | Default | Description |
+|---------|---------|-------------|
+| `PHONE_LINK_TOKEN` | `dev-token` | Auth token for phone UI |
+| `PHONE_LINK_BRIDGE_URL` | `http://127.0.0.1:8765` | Bridge address |
+| `PHONE_LINK_RELAY_PORT` | `9001` | Relay server port |
+| `PHONE_LINK_RELAY_CLI` | `auto` | AI CLI to use (see below) |
+| `PHONE_LINK_RELAY_MODEL` | `llama3.2` | Model name (Ollama only) |
+| `PHONE_LINK_RELAY_CMD` | _(none)_ | Custom command template |
+| `PHONE_LINK_CLAUDE_TIMEOUT` | `120` | Relay subprocess timeout (s) |
+
+---
+
+## Prompt relay — supported CLIs
+
+Relay auto-detects the first available CLI in PATH. Override with `PHONE_LINK_RELAY_CLI`.
+
+| Value | Command used |
+|-------|-------------|
+| `auto` | First of: `claude → gemini → llm → ollama` found in PATH |
+| `claude` | `claude -p "..."` (Claude Code) |
+| `gemini` | `gemini "..."` (Google Gemini CLI) |
+| `ollama` | `ollama run <model> "..."` |
+| `llm` | `llm "..."` (Simon Willison's [llm](https://llm.datasette.io)) |
+| `custom` | Set `PHONE_LINK_RELAY_CMD` to a template, e.g. `my-agent --input {prompt}` |
+
+Custom example (any HTTP agent):
+```json
+"PHONE_LINK_RELAY_CMD": "llm -m gpt-4o {prompt}"
+```
+
+The relay fetches uploaded file context from the bridge, builds an enriched prompt
+(file list + text content for small files), runs the CLI, and sends the response back
+to the phone's **From Agent** section.
+
+### One-time phone setup
+
+After first `phone_begin_upload`, the agent prints:
+```
+Prompt relay running at: http://192.168.x.x:9001/prompt
+In phone UI → Settings → Prompt Relay URL → set to the above URL (one-time setup).
+```
+
+Paste that URL into **Settings → Prompt Relay URL** on the phone. Saved in localStorage — never needed again.
+
+---
+
+## Running the bridge manually (without MCP)
+
+```bash
+uv run python bridge/hermes_phone_bridge.py \
+  --host 0.0.0.0 \
+  --port 8765 \
+  --token dev-token \
+  --token-ttl-seconds 900 \
+  --allow-subnet 192.168.0.0/16 \
+  --webhook-url http://127.0.0.1:9000/webhook   # optional
+```
+
+Running the relay manually:
+```bash
+uv run python relay/example_relay.py --cli claude
+uv run python relay/example_relay.py --cli ollama --model llama3.2
+uv run python relay/example_relay.py --cmd 'llm -m gpt-4o {prompt}'
+```
 
 ---
 
@@ -81,12 +147,12 @@ hermes plugins enable phone
 
 | Tool | What it does |
 |------|-------------|
-| `phone_begin_upload` | Start upload flow — returns QR art + URL + baseline for wait |
+| `phone_begin_upload` | Start upload flow — shows QR + URL inline, returns baseline for wait |
 | `phone_link` | Get upload URL only |
 | `phone_wait_for_files` | Block until new files arrive (uses baseline to skip old ones) |
 | `phone_status` | Bridge + device connection status |
 | `phone_list_files` | List all uploaded files |
-| `phone_read_file` | Read file by id — text returns UTF-8, small binary returns base64, large binary (>100 KB) returns `storage_path` |
+| `phone_read_file` | Read file by id — text → UTF-8, small binary → base64, large binary → `storage_path` |
 | `phone_read_latest_file` | Read most recent upload without needing an id |
 | `phone_create_zip` | Bundle all uploads into a ZIP |
 | `phone_summary` | Human-friendly status + suggested next tool |
@@ -100,25 +166,27 @@ hermes plugins enable phone
 ```
 User: "I want to send files from my phone"
 
-1. phone_begin_upload       → show QR + URL to user
-2. user scans QR, uploads files
-3. phone_wait_for_files     → block until files arrive (pass baseline from step 1)
-4. phone_read_latest_file   → read content
-5. phone_delete_file        → clean up after processing
+1. phone_begin_upload       → QR + URL shown inline, baseline captured
+2. user scans QR, uploads files on phone
+3. phone_wait_for_files     → blocks until files arrive
+4. phone_read_latest_file   → reads content
+5. phone_send_text          → sends result back to phone display
+6. phone_delete_file        → cleans up
 ```
 
 ---
 
 ## Phone UI features
 
-- File upload (multiple, up to 5 MB each)
+- File upload (multiple files, up to 5 MB each)
 - Text paste → saved as `.txt`
 - Create ZIP bundle
 - Per-file delete
-- **PWA**: Add to Home Screen in your mobile browser → standalone app icon
-- **Web Share Target** (Android Chrome, mobile browsers with share target support): share files directly from Photos, Files, or any app → Phone Portal
-- Messages from agent displayed in "From Agent" section
-- 6 collapsible sections, dark theme, 560 px max-width layout
+- Suggestion chips — tap to fire prompt to AI CLI, answer appears in **From Agent**
+- **PWA**: Add to Home Screen → standalone app icon
+- **Web Share Target** (Android Chrome 86+, iOS 16.4+): share directly from Photos, Files, any app
+- Messages from agent in **From Agent** section (polls every 6 s)
+- 6 collapsible sections, dark theme, 560 px max-width
 
 ---
 
@@ -130,7 +198,7 @@ User: "I want to send files from my phone"
 |--------|------|-------------|
 | `GET` | `/api/agent/begin_upload` | Start flow, get URL + file baseline |
 | `GET` | `/api/agent/status` | Connection + file status |
-| `GET` | `/api/agent/files` | File list, supports `since_count` + `since_uploaded_at` |
+| `GET` | `/api/agent/files` | File list — `?since_count=N&since_uploaded_at=T` |
 | `POST` | `/api/agent/command` | Commands: `read_file`, `create_zip`, `delete_file` |
 | `POST` | `/api/agent/send_text` | Send message to phone display |
 
@@ -139,14 +207,14 @@ User: "I want to send files from my phone"
 | Method | Path | Description |
 |--------|------|-------------|
 | `POST` | `/api/web/status` | Device status |
-| `POST` | `/api/web/upload_bundle` | Upload batch (base64 JSON) |
+| `POST` | `/api/web/upload_bundle` | Batch upload (base64 JSON) |
 | `POST` | `/api/web/paste` | Save pasted text |
 | `POST` | `/api/web/zip` | Create ZIP |
 | `POST` | `/api/web/clear` | Clear all files |
 | `POST` | `/api/web/delete_file` | Delete one file |
 | `POST` | `/api/web/messages` | Poll agent messages (clears on read) |
 | `POST` | `/api/web/set_webhook` | Set server-side webhook URL |
-| `POST` | `/api/web/share` | Web Share Target endpoint (multipart) |
+| `POST` | `/api/web/share` | Web Share Target (multipart form) |
 
 ### Other
 
@@ -158,12 +226,19 @@ User: "I want to send files from my phone"
 | `GET` | `/qr.svg` | QR code as SVG |
 | `GET` | `/health` | Health check |
 
+### Relay endpoint
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/prompt` | Receive prompt, run CLI, reply to phone |
+| `GET` | `/health` | Reports active CLI |
+
 ---
 
 ## Limits
 
 - 5 MB per file
-- Large binary files (>100 KB): agent gets `storage_path` to use with Read tool instead of base64
+- Large binary (>100 KB): agent gets `storage_path` to use with Read tool instead of base64
 - Files persisted to `data/` — survive bridge restart
 - Token TTL enforced on web endpoints; agent endpoints are localhost-only
 - LAN only — not designed for internet exposure
