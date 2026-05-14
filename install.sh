@@ -24,7 +24,7 @@ _ensure_gum() {
   tmpdir=$(mktemp -d)
   curl -fsSL \
     "https://github.com/charmbracelet/gum/releases/download/v${version}/gum_${version}_${os}_${arch}.tar.gz" \
-    | tar -xz -C "$tmpdir"
+    | tar -xz -C "$tmpdir" --strip-components 1
   export PATH="$tmpdir:$PATH"
 }
 
