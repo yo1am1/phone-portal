@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Phone Link Bridge</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/icon.svg">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Phone Link">
+  <meta name="theme-color" content="#5b8cff">
+  <link rel="stylesheet" href="/static/styles.css?v=4">
+</head>
+<body>
+  <!-- Header -->
+  <header class="app-header">
+    <div class="app-title">
+      <img src="/icon.svg" class="app-icon" alt="">
+      <span>Phone Link</span>
+    </div>
+    <div class="status-pill" id="statusPill">
+      <span class="status-dot"></span>
+      <span id="statusPillText">Not connected</span>
+    </div>
+  </header>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <div class="wrap">
+
+    <!-- Section: Connect -->
+    <div class="section" id="sectionConnect">
+      <button class="section-header" type="button" aria-expanded="true" data-target="bodyConnect">
+        <span class="section-title">Connect</span>
+        <span class="chevron">▾</span>
+      </button>
+      <div class="section-body" id="bodyConnect">
+        <div class="qr-wrap">
+          <img id="qrImage" class="qr" src="/qr.svg" alt="QR code">
+        </div>
+        <div class="link-row">
+          <span class="label">Direct link</span>
+          <a id="directLink" href="#" target="_blank" rel="noreferrer" class="direct-link">loading…</a>
+          <button type="button" class="btn-copy" id="copyLink" title="Copy link">Copy</button>
+        </div>
+        <div class="field-row">
+          <input id="token" type="password" placeholder="Token (e.g. dev-token)" autocomplete="off">
+        </div>
+        <div class="btn-row">
+          <button id="saveToken" type="button" class="btn-primary">Connect</button>
+          <button id="refresh" type="button" class="btn-secondary">Refresh</button>
+        </div>
+        <p id="connectStatus" class="status-text muted">Not connected yet.</p>
+      </div>
+    </div>
+
+    <!-- Section: Send to Agent -->
+    <div class="section" id="sectionSend">
+      <button class="section-header" type="button" aria-expanded="true" data-target="bodySend">
+        <span class="section-title">Send to Agent</span>
+        <span class="chevron">▾</span>
+      </button>
+      <div class="section-body" id="bodySend">
+        <div class="tabs">
+          <button type="button" class="tab-btn active" data-tab="tabFiles">Files</button>
+          <button type="button" class="tab-btn" data-tab="tabText">Text</button>
+        </div>
+        <div class="tab-panel" id="tabFiles">
+          <label class="file-drop" for="filesInput">
+            <span id="fileDropHint">Choose files from Files / iCloud / On My iPhone</span>
+            <input id="filesInput" type="file" multiple>
+          </label>
+          <div class="btn-row">
+            <button id="uploadBtn" type="button" class="btn-primary" disabled>Upload Files</button>
+          </div>
+          <p id="uploadStatus" class="status-text muted">No files selected.</p>
+        </div>
+        <div class="tab-panel hidden" id="tabText">
+          <input id="pasteName" type="text" placeholder="Filename (e.g. notes.txt)">
+          <textarea id="pasteText" placeholder="Paste text here…"></textarea>
+          <div class="btn-row">
+            <button id="pasteSubmit" type="button" class="btn-primary">Send Text</button>
+          </div>
+          <p id="pasteStatus" class="status-text muted">No text saved yet.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section: From Agent -->
+    <div class="section" id="sectionMessages">
+      <button class="section-header" type="button" aria-expanded="false" data-target="bodyMessages">
+        <span class="section-title">From Agent <span class="badge" id="msgBadge" style="display:none"></span></span>
+        <span class="chevron">▾</span>
+      </button>
+      <div class="section-body collapsed" id="bodyMessages">
+        <div id="messageList">
+          <p class="muted empty-state">No messages yet.</p>
+        </div>
+        <div class="btn-row">
+          <button id="clearMessagesBtn" type="button" class="btn-secondary">Clear</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section: Files -->
+    <div class="section" id="sectionFiles">
+      <button class="section-header" type="button" aria-expanded="true" data-target="bodyFiles">
+        <span class="section-title">Files <span class="badge" id="fileCountBadge">0</span></span>
+        <span class="chevron">▾</span>
+      </button>
+      <div class="section-body" id="bodyFiles">
+        <div class="meter">
+          <div class="meter-bar" id="sizeBar"></div>
+        </div>
+        <div class="meter-meta" id="sizeMeta">0 B used</div>
+        <ul id="fileList" class="file-list"></ul>
+        <div class="suggestions" id="suggestionsWrap">
+          <div class="label">Suggested prompts</div>
+          <div id="suggestedActions" class="chips"></div>
+          <p class="hint">Tap a chip to copy the prompt, then paste it into your agent.</p>
+        </div>
+        <div class="btn-row">
+          <button id="zipBtn" type="button" class="btn-secondary">Create ZIP</button>
+          <button id="clearBtn" type="button" class="btn-danger">Clear All</button>
+        </div>
+        <p id="zipStatus" class="status-text muted"></p>
+      </div>
+    </div>
+
+    <!-- Section: Settings -->
+    <div class="section" id="sectionSettings">
+      <button class="section-header" type="button" aria-expanded="false" data-target="bodySettings">
+        <span class="section-title">Settings</span>
+        <span class="chevron">▾</span>
+      </button>
+      <div class="section-body collapsed" id="bodySettings">
+        <label class="field-label" for="webhookUrl">Webhook URL</label>
+        <input id="webhookUrl" type="text" placeholder="http://127.0.0.1:XXXX/webhook">
+        <p class="hint">Bridge will POST JSON after each upload, paste, share, or zip.</p>
+        <div class="btn-row">
+          <button id="saveWebhook" type="button" class="btn-secondary">Save Webhook</button>
+        </div>
+        <p id="webhookStatus" class="status-text muted"></p>
+        <div class="pwa-hint">
+          <span class="hint">Add to Home Screen in Safari for one-tap sharing</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section: Debug log -->
+    <div class="section" id="sectionDebug">
+      <button class="section-header" type="button" aria-expanded="false" data-target="bodyDebug">
+        <span class="section-title">Debug log</span>
+        <span class="chevron">▾</span>
+      </button>
+      <div class="section-body collapsed" id="bodyDebug">
+        <div id="debugLog">Page loaded.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    }
+  </script>
+  <script src="/static/app.js?v=4"></script>
+</body>
+</html>

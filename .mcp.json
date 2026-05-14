@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "phone-link": {
+      "command": "uv",
+      "args": ["run", "python", "mcp/phone_link_server.py"],
+      "env": {
+        "PHONE_LINK_TOKEN": "dev-token",
+        "PHONE_LINK_BRIDGE_URL": "http://127.0.0.1:8765"
+      }
+    }
+  }
+}

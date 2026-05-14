@@ -1,0 +1,15 @@
+name: ios_phone
+version: 0.1.0
+description: Connect Hermes to a FastAPI iPhone/iPad web bridge for user-selected file access
+provides_tools:
+  - ios_phone_begin_upload
+  - ios_phone_link
+  - ios_phone_wait_for_files
+  - ios_phone_read_latest_file
+  - ios_phone_status
+  - ios_phone_list_files
+  - ios_phone_read_file
+  - ios_phone_summary
+  - ios_phone_create_zip
+  - ios_phone_send_text
+  - ios_phone_delete_file

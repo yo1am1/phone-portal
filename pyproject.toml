@@ -1,0 +1,14 @@
+[project]
+name = "hermes-phone-link"
+version = "0.1.0"
+description = "FastAPI bridge for sending iPhone/iPad files to Hermes"
+requires-python = ">=3.13"
+dependencies = [
+  "fastapi",
+  "uvicorn",
+  "qrcode[pil]",
+  "mcp[cli]>=1.0",
+]
+
+[tool.uv]
+package = false
