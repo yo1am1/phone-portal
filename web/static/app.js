@@ -37,6 +37,8 @@ const zipStatusEl     = document.getElementById('zipStatus');
 const webhookUrlEl    = document.getElementById('webhookUrl');
 const saveWebhookBtn  = document.getElementById('saveWebhook');
 const webhookStatusEl = document.getElementById('webhookStatus');
+const relayUrlEl      = document.getElementById('relayUrl');
+const saveRelayBtn    = document.getElementById('saveRelay');
 
 const debugLogEl      = document.getElementById('debugLog');
 const toastEl         = document.getElementById('toast');
@@ -302,11 +304,34 @@ function renderSuggestedActions(files) {
     chip.className = 'chip';
     chip.textContent = prompt;
     chip.addEventListener('click', async () => {
-      try {
-        await navigator.clipboard.writeText(prompt);
-        showToast('Prompt copied!');
-      } catch {
-        window.prompt('Copy this prompt:', prompt);
+      const relayUrl = localStorage.getItem('phoneLinkRelayUrl') || '';
+      if (relayUrl) {
+        const orig = chip.textContent;
+        chip.textContent = '⏳ Sending…';
+        chip.disabled = true;
+        try {
+          await fetch(relayUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt, session_id: sessionId }),
+          });
+          showToast('Prompt sent to agent!');
+          chip.textContent = '✓ Sent';
+          setTimeout(() => { chip.textContent = orig; chip.disabled = false; }, 2500);
+        } catch (e) {
+          log('Relay failed: ' + (e.message || e) + ' — falling back to clipboard');
+          chip.textContent = orig;
+          chip.disabled = false;
+          try { await navigator.clipboard.writeText(prompt); showToast('Relay failed — copied instead'); }
+          catch { window.prompt('Copy this prompt:', prompt); }
+        }
+      } else {
+        try {
+          await navigator.clipboard.writeText(prompt);
+          showToast('Prompt copied!');
+        } catch {
+          window.prompt('Copy this prompt:', prompt);
+        }
       }
     });
     suggestedActEl.appendChild(chip);
@@ -508,6 +533,8 @@ function loadStoredValues() {
   }
   const storedWebhook = localStorage.getItem('phoneLinkWebhook') || localStorage.getItem('hermesPhoneLinkWebhook') || '';
   if (storedWebhook) webhookUrlEl.value = storedWebhook;
+  const storedRelay = localStorage.getItem('phoneLinkRelayUrl') || '';
+  if (storedRelay && relayUrlEl) relayUrlEl.value = storedRelay;
 }
 
 // ── Event listeners ──
@@ -631,6 +658,15 @@ saveWebhookBtn.addEventListener('click', async () => {
     clearBusy(saveWebhookBtn);
   }
 });
+
+if (saveRelayBtn) {
+  saveRelayBtn.addEventListener('click', () => {
+    const url = (relayUrlEl.value || '').trim();
+    localStorage.setItem('phoneLinkRelayUrl', url);
+    showToast(url ? 'Relay URL saved — chip taps will fire to your agent.' : 'Relay URL cleared.');
+    log('Relay URL: ' + (url || '(cleared)'));
+  });
+}
 
 // ── Boot ──
 (async function init() {

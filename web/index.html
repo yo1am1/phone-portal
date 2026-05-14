@@ -138,11 +138,27 @@
       <div class="section-body collapsed" id="bodySettings">
         <label class="field-label" for="webhookUrl">Webhook URL</label>
         <input id="webhookUrl" type="text" placeholder="http://127.0.0.1:XXXX/webhook">
-        <p class="hint">Bridge will POST JSON after each upload, paste, share, or zip.</p>
+        <p class="hint">Bridge POSTs JSON to this URL after each upload, paste, share, or zip. Payload: <code>{"event":"upload","timestamp":…,"file_count":…}</code></p>
         <div class="btn-row">
           <button id="saveWebhook" type="button" class="btn-secondary">Save Webhook</button>
         </div>
         <p id="webhookStatus" class="status-text muted"></p>
+
+        <div class="settings-divider"></div>
+
+        <label class="field-label" for="relayUrl">Prompt Relay URL</label>
+        <input id="relayUrl" type="text" placeholder="http://127.0.0.1:9001/prompt">
+        <p class="hint">
+          When set, tapping a suggestion chip sends the prompt here instead of copying to clipboard.<br>
+          Your relay server receives <code>{"prompt":"…","session_id":"…"}</code> and can call any agent.<br>
+          Start the example relay: <code>uv run python relay/example_relay.py</code>
+        </p>
+        <div class="btn-row">
+          <button id="saveRelay" type="button" class="btn-secondary">Save Relay URL</button>
+        </div>
+
+        <div class="settings-divider"></div>
+
         <div class="pwa-hint">
           <span class="hint">Add to Home Screen in your mobile browser for one-tap sharing</span>
         </div>

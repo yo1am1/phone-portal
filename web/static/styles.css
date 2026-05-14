@@ -549,3 +549,5 @@ button:disabled { opacity: 0.5; cursor: wait; pointer-events: none; }
   .section-header { padding: 13px 14px; }
   .section-body { padding: 0 14px 14px; }
 }
+
+.settings-divider { height: 1px; background: var(--border); margin: 16px 0; }
