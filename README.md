@@ -30,37 +30,32 @@ data/                           Persisted uploads + state (gitignored)
 
 ---
 
-## Quick start
+## Install
 
+```bash
+curl -sSL https://raw.githubusercontent.com/yo1am1/phone-portal/main/install.sh | bash
+```
+
+Clones repo to `~/.phone-portal`, installs deps, registers MCP server with Claude Code (user scope — available in all projects). Restart Claude Code when done.
+
+**Override defaults:**
+```bash
+PHONE_PORTAL_TOKEN=my-secret-token \
+PHONE_LINK_RELAY_CLI=ollama \
+  curl -sSL https://raw.githubusercontent.com/yo1am1/phone-portal/main/install.sh | bash
+```
+
+**Manual / local dev:**
 ```bash
 git clone https://github.com/yo1am1/phone-portal
 cd phone-portal
 uv sync
+claude mcp add phone-portal --scope user \
+  -e PHONE_LINK_TOKEN=dev-token \
+  -- uv --directory "$PWD" run python mcp/phone_link_server.py
 ```
 
-Add to your agent's MCP config (`.mcp.json` already included):
-
-```json
-{
-  "mcpServers": {
-    "phone-link": {
-      "command": "uv",
-      "args": ["run", "python", "mcp/phone_link_server.py"],
-      "env": {
-        "PHONE_LINK_TOKEN": "dev-token",
-        "PHONE_LINK_BRIDGE_URL": "http://127.0.0.1:8765",
-        "PHONE_LINK_RELAY_PORT": "9001",
-        "PHONE_LINK_RELAY_CLI": "auto"
-      }
-    }
-  }
-}
-```
-
-Start Claude Code — bridge and relay start automatically. Ask:
-> *"I want to send files from my phone"*
-
-Agent shows QR + relay URL. Scan QR on phone. Set relay URL in phone Settings once.
+→ **[Full testing guide: TESTING.md](TESTING.md)**
 
 ---
 
