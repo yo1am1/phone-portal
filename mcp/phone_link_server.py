@@ -38,6 +38,9 @@ BRIDGE_PORT = urllib.parse.urlparse(_bridge_url).port or 8765
 BRIDGE_SCRIPT = ROOT / "bridge" / "hermes_phone_bridge.py"
 
 RELAY_PORT = int(os.getenv("PHONE_LINK_RELAY_PORT", "9001"))
+RELAY_CLI = os.getenv("PHONE_LINK_RELAY_CLI", "auto")
+RELAY_MODEL = os.getenv("PHONE_LINK_RELAY_MODEL", "llama3.2")
+RELAY_CMD = os.getenv("PHONE_LINK_RELAY_CMD", "")
 RELAY_SCRIPT = ROOT / "relay" / "example_relay.py"
 _relay_url = f"http://127.0.0.1:{RELAY_PORT}"
 
@@ -87,12 +90,17 @@ def _start_bridge() -> None:
 
 def _start_relay() -> None:
     global _relay_proc
+    relay_cmd = [
+        "uv", "run", "python", str(RELAY_SCRIPT),
+        "--port", str(RELAY_PORT),
+        "--bridge", _bridge_url,
+        "--cli", RELAY_CLI,
+        "--model", RELAY_MODEL,
+    ]
+    if RELAY_CMD:
+        relay_cmd += ["--cmd", RELAY_CMD]
     _relay_proc = subprocess.Popen(
-        [
-            "uv", "run", "python", str(RELAY_SCRIPT),
-            "--port", str(RELAY_PORT),
-            "--bridge", _bridge_url,
-        ],
+        relay_cmd,
         cwd=str(ROOT),
         stdout=sys.stderr,
         stderr=subprocess.DEVNULL,

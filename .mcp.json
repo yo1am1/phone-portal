@@ -6,7 +6,8 @@
       "env": {
         "PHONE_LINK_TOKEN": "dev-token",
         "PHONE_LINK_BRIDGE_URL": "http://127.0.0.1:8765",
-        "PHONE_LINK_RELAY_PORT": "9001"
+        "PHONE_LINK_RELAY_PORT": "9001",
+        "PHONE_LINK_RELAY_CLI": "auto"
       }
     }
   }
