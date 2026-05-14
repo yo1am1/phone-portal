@@ -53,13 +53,13 @@ box_line() {
 
 # ── Header ────────────────────────────────────────────────────
 nl
-printf "  ${BCY}╭──────────────────────────────────────╮${R}\n"
-printf "  ${BCY}│${R}                                      ${BCY}│${R}\n"
-printf "  ${BCY}│${R}    ${B}📱  phone-portal${R}                  ${BCY}│${R}\n"
-printf "  ${BCY}│${R}    ${DIM}send files to any AI agent${R}        ${BCY}│${R}\n"
-printf "  ${BCY}│${R}    ${DIM}github.com/yo1am1/phone-portal${R}    ${BCY}│${R}\n"
-printf "  ${BCY}│${R}                                      ${BCY}│${R}\n"
-printf "  ${BCY}╰──────────────────────────────────────╯${R}\n"
+printf "  ${BCY}╭────────────────────────────────────────╮${R}\n"
+printf "  ${BCY}│${R}                                        ${BCY}│${R}\n"
+printf "  ${BCY}│${R}    ${B}📱  phone-portal${R}                    ${BCY}│${R}\n"
+printf "  ${BCY}│${R}    ${DIM}send files to any AI agent${R}          ${BCY}│${R}\n"
+printf "  ${BCY}│${R}    ${DIM}github.com/yo1am1/phone-portal${R}      ${BCY}│${R}\n"
+printf "  ${BCY}│${R}                                        ${BCY}│${R}\n"
+printf "  ${BCY}╰────────────────────────────────────────╯${R}\n"
 nl
 
 # ── Preflight ─────────────────────────────────────────────────
@@ -115,23 +115,30 @@ for c in claude gemini llm ollama; do
   fi
 done
 if [ "$RELAY_CLI" = "auto" ] && [ -n "$detected_cli" ]; then
-  relay_label="auto → ${detected_cli}"
+  relay_label="auto -> ${detected_cli}"   # ASCII -> avoids multi-byte width issues
 else
   relay_label="$RELAY_CLI"
 fi
 
+# Truncate values that could overflow the box (inner width = 40)
+# Data line format: "  label   " (11) + value (%-27s = 27) + " " (1) + "│" = 40
+disp_dir="${INSTALL_DIR/$HOME/~}"           # replace /home/user with ~
+disp_token="${TOKEN:0:25}.."               # 25 + ".." = 27, always fits
+disp_relay="${relay_label:0:27}"           # cap at 27
+
 # ── Done ──────────────────────────────────────────────────────
 nl
-printf "  ${BGN}╭──────────────────────────────────────╮${R}\n"
-printf "  ${BGN}│${R}  ${BGN}✓${R}  ${B}Installation complete!${R}               ${BGN}│${R}\n"
-printf "  ${BGN}├──────────────────────────────────────┤${R}\n"
-printf "  ${BGN}│${R}  ${GY}install ${R} ${DIM}%-30s${R} ${BGN}│${R}\n" "$INSTALL_DIR"
-printf "  ${BGN}│${R}  ${GY}token   ${R} ${DIM}%-30s${R} ${BGN}│${R}\n" "$TOKEN"
-printf "  ${BGN}│${R}  ${GY}relay   ${R} ${DIM}%-30s${R} ${BGN}│${R}\n" "$relay_label"
-printf "  ${BGN}├──────────────────────────────────────┤${R}\n"
-printf "  ${BGN}│${R}                                      ${BGN}│${R}\n"
+# inner width = 40  (40 × ─ in separator lines)
+printf "  ${BGN}╭────────────────────────────────────────╮${R}\n"
+printf "  ${BGN}│${R}  ${BGN}✓${R}  ${B}Installation complete!${R}             ${BGN}│${R}\n"
+printf "  ${BGN}├────────────────────────────────────────┤${R}\n"
+printf "  ${BGN}│${R}  ${GY}install${R}   ${DIM}%-27s${R} ${BGN}│${R}\n" "$disp_dir"
+printf "  ${BGN}│${R}  ${GY}token  ${R}   ${DIM}%-27s${R} ${BGN}│${R}\n" "$disp_token"
+printf "  ${BGN}│${R}  ${GY}relay  ${R}   ${DIM}%-27s${R} ${BGN}│${R}\n" "$disp_relay"
+printf "  ${BGN}├────────────────────────────────────────┤${R}\n"
+printf "  ${BGN}│${R}                                        ${BGN}│${R}\n"
 printf "  ${BGN}│${R}  ${B}Restart Claude Code, then ask:${R}        ${BGN}│${R}\n"
 printf "  ${BGN}│${R}  ${CY}\"I want to send files from my phone\"${R}  ${BGN}│${R}\n"
-printf "  ${BGN}│${R}                                      ${BGN}│${R}\n"
-printf "  ${BGN}╰──────────────────────────────────────╯${R}\n"
+printf "  ${BGN}│${R}                                        ${BGN}│${R}\n"
+printf "  ${BGN}╰────────────────────────────────────────╯${R}\n"
 nl
