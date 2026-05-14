@@ -258,15 +258,36 @@ def main() -> None:
     active = _cli_cmd_template or f"{_cli_preset} preset"
 
     server = HTTPServer(("0.0.0.0", args.port), RelayHandler)
-    print(f"[relay] Listening on http://0.0.0.0:{args.port}/prompt")
-    print(f"[relay] Bridge:  {BRIDGE_URL}")
-    print(f"[relay] CLI:     {active}")
-    if _cli_preset == "ollama":
-        print(f"[relay] Model:   {_cli_model}")
-    print(f"[relay] Timeout: {CLAUDE_TIMEOUT}s")
-    print(f"[relay] Set Prompt Relay URL in phone UI → Settings:")
-    print(f"[relay]   http://<your-machine-ip>:{args.port}/prompt")
-    print(f"[relay] Waiting for chip taps…\n")
+
+    # Styled banner via gum if available, plain fallback otherwise.
+    if shutil.which("gum"):
+        lines = [
+            "\x1b[1m📱  phone-portal relay\x1b[0m",
+            "",
+            f"cli      {active}",
+            f"bridge   {BRIDGE_URL}",
+            f"port     {args.port}",
+            f"timeout  {CLAUDE_TIMEOUT}s",
+            "",
+            "Set Prompt Relay URL in phone UI → Settings:",
+            f"\x1b[36mhttp://<your-machine-ip>:{args.port}/prompt\x1b[0m",
+        ]
+        import subprocess as _sp
+        _sp.run(
+            ["gum", "style", "--border", "rounded", "--border-foreground", "99",
+             "--padding", "1 2", "--margin", "0 1", *lines],
+            check=False,
+        )
+    else:
+        print(f"[relay] Listening on http://0.0.0.0:{args.port}/prompt")
+        print(f"[relay] Bridge:  {BRIDGE_URL}")
+        print(f"[relay] CLI:     {active}")
+        if _cli_preset == "ollama":
+            print(f"[relay] Model:   {_cli_model}")
+        print(f"[relay] Timeout: {CLAUDE_TIMEOUT}s")
+        print(f"[relay] Set Prompt Relay URL in phone UI → Settings:")
+        print(f"[relay]   http://<your-machine-ip>:{args.port}/prompt")
+    print()
     try:
         server.serve_forever()
     except KeyboardInterrupt:
