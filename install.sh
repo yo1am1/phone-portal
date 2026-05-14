@@ -6,23 +6,25 @@ set -euo pipefail
 INSTALL_DIR="${PHONE_PORTAL_DIR:-$HOME/.phone-portal}"
 TOKEN="${PHONE_PORTAL_TOKEN:-$(openssl rand -hex 16 2>/dev/null || python3 -c 'import secrets; print(secrets.token_hex(16))')}"
 RELAY_CLI="${PHONE_LINK_RELAY_CLI:-auto}"
-GUM_VERSION="0.14.5"
-
 # ── Bootstrap gum ─────────────────────────────────────────────
 _ensure_gum() {
   command -v gum >/dev/null 2>&1 && return 0
-  printf "  bootstrapping gum %s...\n" "$GUM_VERSION"
+  printf "  bootstrapping gum...\n"
   if command -v brew >/dev/null 2>&1; then
     brew install gum --quiet 2>/dev/null && return 0
   fi
-  local os arch tmpdir
-  os=$(uname -s | tr '[:upper:]' '[:lower:]')
-  arch=$(uname -m)
-  case "$arch" in x86_64) arch="amd64" ;; aarch64|arm64) arch="arm64" ;; esac
+  # Asset naming: gum_VERSION_Linux_x86_64.tar.gz / gum_VERSION_Darwin_arm64.tar.gz
+  local os arch version tmpdir
+  os=$(uname -s)    # Linux or Darwin — keep capitalised, matches asset names
+  arch=$(uname -m)  # x86_64 or arm64 — keep as-is
+  case "$arch" in aarch64) arch="arm64" ;; esac
+  version=$(curl -fsSL "https://api.github.com/repos/charmbracelet/gum/releases/latest" \
+    | python3 -c "import sys,json; print(json.load(sys.stdin)['tag_name'].lstrip('v'))" 2>/dev/null \
+    || echo "0.17.0")
   tmpdir=$(mktemp -d)
   curl -fsSL \
-    "https://github.com/charmbracelet/gum/releases/download/v${GUM_VERSION}/gum_${GUM_VERSION}_${os}_${arch}.tar.gz" \
-    | tar -xz -C "$tmpdir" 2>/dev/null
+    "https://github.com/charmbracelet/gum/releases/download/v${version}/gum_${version}_${os}_${arch}.tar.gz" \
+    | tar -xz -C "$tmpdir"
   export PATH="$tmpdir:$PATH"
 }
 
