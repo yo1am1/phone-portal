@@ -77,6 +77,57 @@ function showToast(msg, duration = 2500) {
   setTimeout(() => toastEl.classList.remove('show'), duration);
 }
 
+// iOS Safari over HTTP blocks navigator.clipboard and window.prompt.
+// Use a hidden textarea + execCommand as fallback, then show prompt text inline.
+async function copyText(text) {
+  // 1. Modern clipboard API (works on HTTPS or localhost)
+  if (navigator.clipboard && window.isSecureContext) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+  // 2. Legacy execCommand (iOS Safari over HTTP)
+  const el = document.createElement('textarea');
+  el.value = text;
+  el.style.cssText = 'position:fixed;top:0;left:0;opacity:0;font-size:16px';
+  document.body.appendChild(el);
+  el.focus();
+  el.select();
+  const ok = document.execCommand('copy');
+  document.body.removeChild(el);
+  if (!ok) throw new Error('execCommand copy failed');
+}
+
+function showPromptPanel(text) {
+  // Show the prompt text in a selectable panel — last resort when clipboard unavailable.
+  let panel = document.getElementById('promptPanel');
+  if (!panel) {
+    panel = document.createElement('div');
+    panel.id = 'promptPanel';
+    panel.style.cssText = [
+      'position:fixed;bottom:80px;left:16px;right:16px;z-index:1000',
+      'background:#1a2444;border:1px solid #5b8cff;border-radius:12px',
+      'padding:12px;font-size:14px;color:#edf2ff',
+    ].join(';');
+    const close = document.createElement('button');
+    close.textContent = '✕';
+    close.style.cssText = 'float:right;background:none;border:none;color:#9fb0e0;font-size:16px;cursor:pointer;padding:0 4px';
+    close.onclick = () => panel.remove();
+    const label = document.createElement('div');
+    label.style.cssText = 'font-size:11px;color:#9fb0e0;margin-bottom:6px;text-transform:uppercase';
+    label.textContent = 'Copy this prompt:';
+    const textarea = document.createElement('textarea');
+    textarea.style.cssText = 'width:100%;background:#0b1020;border:1px solid #2b3768;border-radius:6px;color:#edf2ff;padding:8px;font-size:13px;resize:none;height:80px';
+    textarea.readOnly = true;
+    panel.appendChild(close);
+    panel.appendChild(label);
+    panel.appendChild(textarea);
+    document.body.appendChild(panel);
+  }
+  panel.querySelector('textarea').value = text;
+  panel.querySelector('textarea').select();
+  panel.style.display = 'block';
+}
+
 function formatBytes(bytes) {
   if (!bytes && bytes !== 0) return '0 B';
   if (bytes === 0) return '0 B';
@@ -322,15 +373,15 @@ function renderSuggestedActions(files) {
           log('Relay failed: ' + (e.message || e) + ' — falling back to clipboard');
           chip.textContent = orig;
           chip.disabled = false;
-          try { await navigator.clipboard.writeText(prompt); showToast('Relay failed — copied instead'); }
-          catch { window.prompt('Copy this prompt:', prompt); }
+          try { await copyText(prompt); showToast('Relay failed — copied instead'); }
+          catch { showPromptPanel(prompt); }
         }
       } else {
         try {
-          await navigator.clipboard.writeText(prompt);
+          await copyText(prompt);
           showToast('Prompt copied!');
         } catch {
-          window.prompt('Copy this prompt:', prompt);
+          showPromptPanel(prompt);
         }
       }
     });
@@ -560,10 +611,10 @@ copyLinkBtn.addEventListener('click', async () => {
   const href = directLinkEl.href;
   if (!href || href === '#') return;
   try {
-    await navigator.clipboard.writeText(href);
+    await copyText(href);
     showToast('Link copied!');
   } catch {
-    window.prompt('Copy this link:', href);
+    showPromptPanel(href);
   }
 });
 
