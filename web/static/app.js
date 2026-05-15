@@ -1,4 +1,4 @@
-/* Phone Link Bridge — app.js v5 */
+/* Phone Link Bridge — app.js v6 */
 
 // ── DOM refs ──
 const statusPillEl    = document.getElementById('statusPill');
@@ -47,7 +47,6 @@ const toastEl         = document.getElementById('toast');
 // ── Constants ──
 const MAX_UPLOAD_BYTES = 5_000_000;
 const SOFT_TOTAL_LIMIT = 25_000_000;
-const MSG_POLL_INTERVAL = 6000;
 
 // ── State ──
 const params = new URLSearchParams(window.location.search);
@@ -55,7 +54,9 @@ const sessionId = localStorage.getItem('phoneLinkSession') || localStorage.getIt
 localStorage.setItem('phoneLinkSession', sessionId);
 
 let isConnected = false;
-let messagePollerTimer = null;
+let ws = null;
+let wsReconnectTimer = null;
+let wsReconnectDelay = 1500;
 let localMessages = [];
 let unreadCount = 0;
 
@@ -230,13 +231,13 @@ async function refreshStatus() {
     document.getElementById('onboardingHint').style.display = 'none';
     collapseSection('bodyConnect');
     renderFiles(data.files || []);
-    startMessagePoller();
+    connectWebSocket();
   } catch (err) {
     setConnected(false, 'Not connected');
     connectStatusEl.textContent = 'Not connected: ' + err.message;
     connectStatusEl.className = 'status-text bad';
     document.getElementById('onboardingHint').style.display = '';
-    stopMessagePoller();
+    disconnectWebSocket();
     expandSection('bodyConnect');
     log('Status error: ' + err.message);
     throw err;
@@ -446,32 +447,63 @@ async function deleteFile(fileId) {
   }
 }
 
-// ── Message polling ──
-function startMessagePoller() {
-  if (messagePollerTimer) return;
-  messagePollerTimer = setInterval(pollMessages, MSG_POLL_INTERVAL);
-}
+// ── WebSocket ──
+function connectWebSocket() {
+  if (!tokenEl.value) return;
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const url = `${proto}//${location.host}/ws?token=${encodeURIComponent(tokenEl.value)}&session_id=${encodeURIComponent(sessionId)}`;
 
-function stopMessagePoller() {
-  if (messagePollerTimer) {
-    clearInterval(messagePollerTimer);
-    messagePollerTimer = null;
-  }
-}
+  try { if (ws) ws.close(); } catch {}
+  ws = new WebSocket(url);
 
-async function pollMessages() {
-  if (!isConnected) return;
-  try {
-    const data = await api('/api/web/messages', {});
-    const msgs = data.messages || [];
-    if (msgs.length) {
-      localMessages = localMessages.concat(msgs);
-      unreadCount += msgs.length;
-      renderMessages();
-      expandSection('bodyMessages');
+  ws.onopen = () => {
+    wsReconnectDelay = 1500;
+    log('WebSocket connected');
+  };
+
+  ws.onmessage = (event) => {
+    try {
+      const msg = JSON.parse(event.data);
+      if (msg.type === 'message' && msg.data) {
+        localMessages.push(msg.data);
+        unreadCount++;
+        renderMessages();
+        expandSection('bodyMessages');
+        if (msgBadgeEl) {
+          msgBadgeEl.textContent = unreadCount;
+          msgBadgeEl.style.display = '';
+          msgBadgeEl.classList.add('has-new');
+        }
+      } else if (msg.type === 'file_update') {
+        refreshStatus().catch(() => {});
+      } else if (msg.type === 'ping') {
+        ws.send(JSON.stringify({ type: 'pong' }));
+      }
+    } catch (e) {
+      log('WS parse error: ' + e.message);
     }
-  } catch {
-    // silent — don't spam log for polling errors
+  };
+
+  ws.onclose = (event) => {
+    log(`WebSocket closed (${event.code}), reconnecting in ${wsReconnectDelay}ms`);
+    if (isConnected) {
+      wsReconnectTimer = setTimeout(() => {
+        wsReconnectDelay = Math.min(wsReconnectDelay * 2, 30000);
+        connectWebSocket();
+      }, wsReconnectDelay);
+    }
+  };
+
+  ws.onerror = () => {
+    log('WebSocket error — will reconnect');
+  };
+}
+
+function disconnectWebSocket() {
+  clearTimeout(wsReconnectTimer);
+  if (ws) {
+    try { ws.close(1000); } catch {}
+    ws = null;
   }
 }
 

@@ -8,6 +8,7 @@ Frontend assets live under web/.
 from __future__ import annotations
 
 import argparse
+import asyncio
 import base64
 import io
 import json
@@ -27,11 +28,61 @@ from urllib.parse import quote
 
 import qrcode
 import uvicorn
-from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
+from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, Query, Request, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from qrcode.image.svg import SvgPathImage
+
+class ConnectionManager:
+    def __init__(self) -> None:
+        # device_id -> set of WebSocket connections
+        self._connections: dict[str, set] = {}
+        self._loop: asyncio.AbstractEventLoop | None = None
+
+    def set_loop(self, loop: asyncio.AbstractEventLoop) -> None:
+        self._loop = loop
+
+    def _register(self, device_id: str, ws) -> None:
+        self._connections.setdefault(device_id, set()).add(ws)
+
+    def _remove(self, device_id: str, ws) -> None:
+        if device_id in self._connections:
+            self._connections[device_id].discard(ws)
+
+    async def _send_safe(self, ws, data: dict) -> bool:
+        try:
+            await ws.send_json(data)
+            return True
+        except Exception:
+            return False
+
+    async def push_to_device(self, device_id: str, data: dict) -> None:
+        dead = set()
+        for ws in list(self._connections.get(device_id, set())):
+            if not await self._send_safe(ws, data):
+                dead.add(ws)
+        for ws in dead:
+            self._remove(device_id, ws)
+
+    async def broadcast(self, data: dict) -> None:
+        for device_id in list(self._connections):
+            await self.push_to_device(device_id, data)
+
+    def push_sync(self, device_id: str, data: dict) -> None:
+        """Schedule a push from a sync context (uses the captured event loop)."""
+        if self._loop and self._loop.is_running():
+            asyncio.run_coroutine_threadsafe(
+                self.push_to_device(device_id, data), self._loop
+            )
+
+    def broadcast_sync(self, data: dict) -> None:
+        if self._loop and self._loop.is_running():
+            asyncio.run_coroutine_threadsafe(self.broadcast(data), self._loop)
+
+
+ws_manager = ConnectionManager()
+
 
 MAX_UPLOAD_BYTES = 5_000_000
 BINARY_INLINE_MAX_BYTES = 100_000
@@ -149,6 +200,10 @@ class BridgeState:
             device.files.sort(key=lambda item: float(item.get("uploaded_at") or 0.0))
             device.last_seen = now
             self._save_to_disk()
+            ws_manager.broadcast_sync({
+                "type": "file_update",
+                "data": {"device_id": device.device_id, "file_count": len(device.files)},
+            })
             return meta
 
     def clear_device(self, device: DeviceState) -> None:
@@ -163,6 +218,7 @@ class BridgeState:
             device.files = []
             device.last_seen = time.time()
             self._save_to_disk()
+            ws_manager.broadcast_sync({"type": "file_update", "data": {"device_id": device.device_id, "file_count": 0}})
 
     def fire_webhook(self, event: str, payload: dict) -> None:
         if not self.webhook_url:
@@ -647,6 +703,31 @@ def web_messages(body: WebBase, request: Request) -> dict[str, Any]:
     return {"ok": True, "messages": messages}
 
 
+@app.websocket("/ws")
+async def websocket_endpoint(
+    websocket: WebSocket,
+    token: str = Query(...),
+    session_id: str = Query(...),
+) -> None:
+    if not STATE.authenticate(token):
+        await websocket.close(code=4001)
+        return
+    ws_manager.set_loop(asyncio.get_event_loop())
+    await websocket.accept()
+    device = STATE.get_or_create_web_device(session_id)
+    ws_manager._register(device.device_id, websocket)
+    try:
+        while True:
+            # Receive keepalive pongs (or close)
+            data = await websocket.receive_json()
+            if data.get("type") == "ping":
+                await websocket.send_json({"type": "pong"})
+    except (WebSocketDisconnect, Exception):
+        pass
+    finally:
+        ws_manager._remove(device.device_id, websocket)
+
+
 @app.post("/api/web/delete_file")
 def web_delete_file(body: DeleteFileBody, request: Request) -> dict[str, Any]:
     if not STATE.authenticate(body.token):
@@ -770,6 +851,7 @@ def agent_send_text(body: SendTextBody) -> dict[str, Any]:
     }
     with STATE._lock:
         device.outbox.append(message)
+    ws_manager.push_sync(device.device_id, {"type": "message", "data": message})
     return {"ok": True, "message": message}
 
 
