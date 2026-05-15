@@ -457,25 +457,23 @@ filesInputEl.addEventListener('change', () => {
   }
 });
 
-copyLinkBtn.addEventListener('click', async () => {
+copyLinkBtn.addEventListener('click', () => {
   const href = directLinkEl.href;
   if (!href || href === '#') return;
-  // Web Share API — opens native iOS share sheet
-  if (navigator.share) {
-    try { await navigator.share({ url: href, title: 'Phone Link' }); return; } catch {}
-  }
-  if (navigator.clipboard && window.isSecureContext) {
-    try { await navigator.clipboard.writeText(href); showToast('Link copied!'); return; } catch {}
-  }
-  // execCommand fallback (iOS Safari over HTTP)
+  // execCommand is most reliable on iOS Safari over HTTP
   const el = document.createElement('input');
   el.value = href;
-  el.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+  el.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0;font-size:16px';
   document.body.appendChild(el);
-  el.focus(); el.select();
-  document.execCommand('copy');
+  el.focus();
+  el.setSelectionRange(0, el.value.length);
+  try {
+    document.execCommand('copy');
+    showToast('Link copied!');
+  } catch {
+    showToast(href);  // show URL as toast so user can manually copy
+  }
   document.body.removeChild(el);
-  showToast('Link copied!');
 });
 
 saveTokenBtn.addEventListener('click', async () => {
