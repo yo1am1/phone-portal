@@ -60,7 +60,8 @@ printf "\n"
 # ── Clone / update ────────────────────────────────────────────
 if [ -d "$INSTALL_DIR/.git" ]; then
   step "Updating existing install"
-  run "Pulling latest changes..." git -C "$INSTALL_DIR" pull --ff-only --quiet
+  run "Fetching latest..." git -C "$INSTALL_DIR" fetch --quiet origin
+  run "Applying updates..." git -C "$INSTALL_DIR" reset --hard origin/main --quiet
   ok "Up to date"
 else
   step "Cloning repository"
