@@ -47,7 +47,16 @@ step() { gum style --bold --foreground 99 "  ▌ $1"; }
 ok()   { gum style --foreground 2          "  ✓ $1"; }
 warn() { gum style --foreground 3          "  ⚠ $1"; }
 die()  { gum style --foreground 1 --bold   "  ✗ $1"; printf "\n"; exit 1; }
-run()  { local t="$1"; shift; gum spin --title "    $t" --spinner points -- "$@" 2>/dev/null; }
+run() {
+  local t="$1"; shift
+  if gum spin --title "    $t" --spinner points -- "$@" 2>/dev/null; then
+    return 0
+  else
+    # spinner failed or command failed — run directly so errors surface
+    printf "  ${GY}  %s${R}\n" "$t"
+    "$@"
+  fi
+}
 
 # ── Preflight ─────────────────────────────────────────────────
 step "Checking requirements"
@@ -60,8 +69,8 @@ printf "\n"
 # ── Clone / update ────────────────────────────────────────────
 if [ -d "$INSTALL_DIR/.git" ]; then
   step "Updating existing install"
-  run "Fetching latest..." git -C "$INSTALL_DIR" fetch --quiet origin
-  run "Applying updates..." git -C "$INSTALL_DIR" reset --hard origin/main --quiet
+  run "Fetching latest..." git -C "$INSTALL_DIR" fetch origin
+  run "Applying updates..." git -C "$INSTALL_DIR" reset --hard -q origin/main
   ok "Up to date"
 else
   step "Cloning repository"
