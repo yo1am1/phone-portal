@@ -49,11 +49,10 @@ warn() { gum style --foreground 3          "  ⚠ $1"; }
 die()  { gum style --foreground 1 --bold   "  ✗ $1"; printf "\n"; exit 1; }
 run() {
   local t="$1"; shift
-  if gum spin --title "    $t" --spinner points -- "$@" 2>/dev/null; then
+  if gum spin --title "    $t" --spinner points -- "$@"; then
     return 0
   else
-    # spinner failed or command failed — run directly so errors surface
-    printf "  ${GY}  %s${R}\n" "$t"
+    gum style --faint "    $t"
     "$@"
   fi
 }
