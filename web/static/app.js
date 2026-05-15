@@ -227,7 +227,7 @@ async function refreshStatus() {
     setConnected(true, `Connected · ${count} file${count !== 1 ? 's' : ''}`);
     connectStatusEl.textContent = `Connected as ${data.device.name}. ${count} file(s).`;
     connectStatusEl.className = 'status-text ok';
-    // Auto-collapse connect section when connected
+    document.getElementById('onboardingHint').style.display = 'none';
     collapseSection('bodyConnect');
     renderFiles(data.files || []);
     startMessagePoller();
@@ -235,6 +235,7 @@ async function refreshStatus() {
     setConnected(false, 'Not connected');
     connectStatusEl.textContent = 'Not connected: ' + err.message;
     connectStatusEl.className = 'status-text bad';
+    document.getElementById('onboardingHint').style.display = '';
     stopMessagePoller();
     expandSection('bodyConnect');
     log('Status error: ' + err.message);

@@ -10,7 +10,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Phone Link">
   <meta name="theme-color" content="#5b8cff">
-  <link rel="stylesheet" href="/static/styles.css?v=9">
+  <link rel="stylesheet" href="/static/styles.css?v=12">
 </head>
 <body>
   <!-- Header -->
@@ -37,11 +37,17 @@
         <span class="chevron">▾</span>
       </button>
       <div class="section-body" id="bodyConnect">
+        <div class="onboarding-hint" id="onboardingHint">
+          <div class="onboarding-icon">📱</div>
+          <p class="onboarding-lead">Open your AI agent and ask:</p>
+          <p class="onboarding-phrase">"I want to send files from my phone"</p>
+          <p class="onboarding-sub">The agent will show a QR and connect this page automatically. Or scan the QR below and enter your token.</p>
+        </div>
         <div class="qr-wrap">
           <img id="qrImage" class="qr" src="/qr.svg" alt="QR code">
         </div>
         <div class="field-row">
-          <input id="token" type="password" placeholder="Token (e.g. dev-token)" autocomplete="off">
+          <input id="token" type="password" placeholder="Paste token from agent here" autocomplete="off">
         </div>
         <div class="btn-row">
           <button id="saveToken" type="button" class="btn-primary">Connect</button>
@@ -169,6 +175,6 @@
       navigator.serviceWorker.register('/sw.js').catch(() => {});
     }
   </script>
-  <script src="/static/app.js?v=11"></script>
+  <script src="/static/app.js?v=12"></script>
 </body>
 </html>

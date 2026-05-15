@@ -597,3 +597,23 @@ button:disabled { opacity: 0.5; cursor: wait; pointer-events: none; }
   cursor: pointer;
   padding: 0;
 }
+
+/* ── Onboarding hint ── */
+.onboarding-hint {
+  background: rgba(91, 140, 255, 0.08);
+  border: 1px solid rgba(91, 140, 255, 0.25);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  text-align: center;
+}
+.onboarding-icon { font-size: 28px; margin-bottom: 8px; }
+.onboarding-lead { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+.onboarding-phrase {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--primary);
+  margin-bottom: 8px;
+  font-style: italic;
+}
+.onboarding-sub { font-size: 12px; color: var(--muted); line-height: 1.5; }
