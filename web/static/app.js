@@ -13,6 +13,9 @@ const filesInputEl    = document.getElementById('filesInput');
 const fileDropHintEl  = document.getElementById('fileDropHint');
 const uploadBtn       = document.getElementById('uploadBtn');
 const uploadStatusEl  = document.getElementById('uploadStatus');
+const cameraInputEl   = document.getElementById('cameraInput');
+const cameraHintEl    = document.getElementById('cameraHint');
+const cameraStatusEl  = document.getElementById('cameraStatus');
 
 const pasteNameEl     = document.getElementById('pasteName');
 const pasteTextEl     = document.getElementById('pasteText');
@@ -80,6 +83,31 @@ function formatBytes(bytes) {
 function formatTime(ts) {
   if (!ts) return '';
   return new Date(ts * 1000).toLocaleString();
+}
+
+// Resize image files that exceed the upload limit using canvas.
+// Returns a new File (JPEG) if resize was needed, otherwise the original.
+async function resizeImageIfNeeded(file, maxBytes = MAX_UPLOAD_BYTES, maxWidth = 1920, quality = 0.85) {
+  if (!file.type.startsWith('image/') && !file.name.match(/\.(heic|heif)$/i)) return file;
+  if (file.size <= maxBytes) return file;
+  return new Promise(resolve => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, maxWidth / img.width);
+      const canvas = document.createElement('canvas');
+      canvas.width  = Math.round(img.width  * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(blob => {
+        const name = file.name.replace(/\.[^.]+$/, '.jpg');
+        resolve(new File([blob], name, { type: 'image/jpeg' }));
+      }, 'image/jpeg', quality);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+    img.src = url;
+  });
 }
 
 function setBusy(btn, txt) {
@@ -260,20 +288,22 @@ function renderFiles(files) {
   }
 }
 
-// ── Upload ──
-async function uploadFiles() {
-  const files = Array.from(filesInputEl.files || []);
-  if (!files.length) {
-    uploadStatusEl.textContent = 'Choose at least one file first.';
-    uploadStatusEl.className = 'status-text bad';
-    return;
-  }
-  uploadStatusEl.textContent = `Uploading ${files.length} file(s)…`;
-  uploadStatusEl.className = 'status-text busy';
+// ── Shared upload logic (files tab + camera tab) ──
+async function uploadFileList(rawFiles, statusEl, onSuccess) {
+  if (!rawFiles.length) return;
+  statusEl.textContent = `Processing ${rawFiles.length} file(s)…`;
+  statusEl.className = 'status-text busy';
 
   const bundle = [];
-  for (const file of files) {
-    log('Reading ' + file.name + ' (' + file.size + ' bytes)');
+  for (const raw of rawFiles) {
+    // Resize images that exceed limit before pre-flight check
+    const file = await resizeImageIfNeeded(raw);
+    if (file.size > MAX_UPLOAD_BYTES) {
+      statusEl.textContent = `${file.name} is too large (${formatBytes(file.size)}). Max ${formatBytes(MAX_UPLOAD_BYTES)}.`;
+      statusEl.className = 'status-text bad';
+      return;
+    }
+    log(`Reading ${file.name} (${formatBytes(file.size)})`);
     const buffer = await file.arrayBuffer();
     const bytes = new Uint8Array(buffer);
     let binary = '';
@@ -282,14 +312,39 @@ async function uploadFiles() {
     }
     bundle.push({ name: file.name, mime_type: file.type || 'application/octet-stream', size: file.size, base64: btoa(binary) });
   }
+
+  statusEl.textContent = `Uploading ${bundle.length} file(s)…`;
   await api('/api/web/upload_bundle', { files: bundle });
-  uploadStatusEl.textContent = `Uploaded ${files.length} file(s).`;
-  uploadStatusEl.className = 'status-text ok';
-  filesInputEl.value = '';
-  fileDropHintEl.textContent = 'Choose files from Files / iCloud / On My Device';
-  uploadBtn.disabled = true;
+  statusEl.textContent = `Uploaded ${bundle.length} file(s).`;
+  statusEl.className = 'status-text ok';
   await refreshStatus();
-  if (files.length > 1) await createZip();
+  if (bundle.length > 1) await createZip();
+  if (onSuccess) onSuccess();
+}
+
+// ── Files tab upload ──
+async function uploadFiles() {
+  const files = Array.from(filesInputEl.files || []);
+  if (!files.length) {
+    uploadStatusEl.textContent = 'Choose at least one file first.';
+    uploadStatusEl.className = 'status-text bad';
+    return;
+  }
+  await uploadFileList(files, uploadStatusEl, () => {
+    filesInputEl.value = '';
+    fileDropHintEl.textContent = 'Choose files from Files / iCloud / On My Device';
+    uploadBtn.disabled = true;
+  });
+}
+
+// ── Camera tab upload ──
+async function uploadCameraPhoto() {
+  const files = Array.from(cameraInputEl.files || []);
+  if (!files.length) return;
+  cameraHintEl.textContent = '📷  Tap to open camera';
+  await uploadFileList(files, cameraStatusEl, () => {
+    cameraInputEl.value = '';
+  });
 }
 
 // ── Paste ──
@@ -448,6 +503,22 @@ filesInputEl.addEventListener('change', () => {
     uploadBtn.disabled = true;
     uploadStatusEl.textContent = 'No files selected.';
     uploadStatusEl.className = 'status-text muted';
+  }
+});
+
+// Camera: auto-upload immediately after capture
+cameraInputEl.addEventListener('change', async () => {
+  if (!cameraInputEl.files || !cameraInputEl.files.length) return;
+  cameraHintEl.textContent = '⏳  Uploading…';
+  try {
+    await uploadCameraPhoto();
+    cameraHintEl.textContent = '✓  Uploaded — tap to take another';
+    setTimeout(() => { cameraHintEl.textContent = '📷  Tap to open camera'; }, 3000);
+  } catch (err) {
+    cameraStatusEl.textContent = 'Upload failed: ' + err.message;
+    cameraStatusEl.className = 'status-text bad';
+    cameraHintEl.textContent = '📷  Tap to open camera';
+    log('Camera upload failed: ' + err.message);
   }
 });
 

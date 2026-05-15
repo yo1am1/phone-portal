@@ -10,7 +10,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Phone Link">
   <meta name="theme-color" content="#5b8cff">
-  <link rel="stylesheet" href="/static/styles.css?v=5">
+  <link rel="stylesheet" href="/static/styles.css?v=8">
 </head>
 <body>
   <!-- Header -->
@@ -60,8 +60,11 @@
       <div class="section-body" id="bodySend">
         <div class="tabs">
           <button type="button" class="tab-btn active" data-tab="tabFiles">Files</button>
+          <button type="button" class="tab-btn" data-tab="tabCamera">Camera</button>
           <button type="button" class="tab-btn" data-tab="tabText">Text</button>
         </div>
+
+        <!-- Files tab -->
         <div class="tab-panel" id="tabFiles">
           <label class="file-drop" for="filesInput">
             <span id="fileDropHint">Choose files from Files / iCloud / On My Device</span>
@@ -72,6 +75,17 @@
           </div>
           <p id="uploadStatus" class="status-text muted">No files selected.</p>
         </div>
+
+        <!-- Camera tab -->
+        <div class="tab-panel hidden" id="tabCamera">
+          <label class="file-drop camera-drop" for="cameraInput">
+            <span id="cameraHint">📷  Tap to open camera</span>
+            <input id="cameraInput" type="file" accept="image/*" capture="environment">
+          </label>
+          <p id="cameraStatus" class="status-text muted">Photo uploads automatically after capture.</p>
+        </div>
+
+        <!-- Text tab -->
         <div class="tab-panel hidden" id="tabText">
           <input id="pasteName" type="text" placeholder="Filename (e.g. notes.txt)">
           <textarea id="pasteText" placeholder="Paste text here…"></textarea>
@@ -150,6 +164,6 @@
       navigator.serviceWorker.register('/sw.js').catch(() => {});
     }
   </script>
-  <script src="/static/app.js?v=7"></script>
+  <script src="/static/app.js?v=8"></script>
 </body>
 </html>

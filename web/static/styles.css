@@ -342,6 +342,15 @@ button:disabled { opacity: 0.5; cursor: wait; pointer-events: none; }
 
 .file-drop:hover { border-color: var(--primary); color: var(--text); }
 
+.camera-drop {
+  min-height: 120px;
+  border-color: var(--primary);
+  background: var(--panel-2);
+  font-size: 18px;
+  gap: 8px;
+}
+.camera-drop:active { background: var(--primary-2); }
+
 .file-drop input[type=file] {
   position: absolute;
   opacity: 0;
