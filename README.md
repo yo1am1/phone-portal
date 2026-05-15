@@ -20,7 +20,7 @@ Tap a suggestion chip → prompt fires to your AI CLI automatically.
 ## Structure
 
 ```
-bridge/hermes_phone_bridge.py   FastAPI server, all API endpoints
+bridge/phone_bridge.py   FastAPI server, all API endpoints
 mcp/phone_link_server.py        MCP server — auto-starts bridge + relay on launch
 relay/example_relay.py          Prompt relay — receives chip taps, runs AI CLI, replies to phone
 plugin/phone/                   Hermes plugin (same 11 tools)
@@ -33,16 +33,46 @@ data/                           Persisted uploads + state (gitignored)
 ## Install
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/yo1am1/phone-portal/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/yo1am1/phone-portal/main/install.sh | bash
 ```
 
-Clones repo to `~/.phone-portal`, installs deps, registers MCP server with Claude Code (user scope — available in all projects). Restart Claude Code when done.
+Clones repo to `~/.phone-portal`, installs deps, registers with every supported CLI it finds (currently Claude Code and Codex), and writes a global `~/.mcp.json` entry for other MCP clients. Restart your agent(s) when done.
+
+**Interactive setup (TUI):**
+```bash
+curl -fsSL https://raw.githubusercontent.com/yo1am1/phone-portal/main/install.sh | bash -s -- --ui
+```
+
+**Install on specific agent(s):**
+```bash
+# Claude Code only
+curl -fsSL https://raw.githubusercontent.com/yo1am1/phone-portal/main/install.sh | bash -s -- --targets claude
+
+# Write ~/.mcp.json (for MCP clients that read it)
+curl -fsSL https://raw.githubusercontent.com/yo1am1/phone-portal/main/install.sh | bash -s -- --targets mcpjson-global
+
+# Everything: auto-detected CLIs + ~/.mcp.json
+curl -fsSL https://raw.githubusercontent.com/yo1am1/phone-portal/main/install.sh | bash -s -- --all
+```
+
+**Private repo / fork:**
+```bash
+PHONE_PORTAL_REPO_URL=https://github.com/<you>/phone-portal \
+  curl -fsSL https://raw.githubusercontent.com/<you>/phone-portal/main/install.sh | bash
+```
 
 **Override defaults:**
 ```bash
 PHONE_PORTAL_TOKEN=my-secret-token \
 PHONE_LINK_RELAY_CLI=ollama \
-  curl -sSL https://raw.githubusercontent.com/yo1am1/phone-portal/main/install.sh | bash
+  curl -fsSL https://raw.githubusercontent.com/yo1am1/phone-portal/main/install.sh | bash
+```
+
+**Custom relay command:**
+```bash
+PHONE_PORTAL_TOKEN=my-secret-token \
+PHONE_LINK_RELAY_CMD='llm -m gpt-4o {prompt}' \
+  curl -fsSL https://raw.githubusercontent.com/yo1am1/phone-portal/main/install.sh | bash
 ```
 
 **Manual / local dev:**
@@ -54,6 +84,8 @@ claude mcp add phone-portal --scope user \
   -e PHONE_LINK_TOKEN=dev-token \
   -- uv --directory "$PWD" run python mcp/phone_link_server.py
 ```
+
+`phone-portal` also ships a repo-local `.mcp.json`, which is useful for MCP clients that read workspace config directly.
 
 → **[Full testing guide: TESTING.md](TESTING.md)**
 
@@ -68,14 +100,14 @@ claude mcp add phone-portal --scope user \
 | `PHONE_LINK_RELAY_PORT` | `9001` | Relay server port |
 | `PHONE_LINK_RELAY_CLI` | `auto` | AI CLI to use (see below) |
 | `PHONE_LINK_RELAY_MODEL` | `llama3.2` | Model name (Ollama only) |
-| `PHONE_LINK_RELAY_CMD` | _(none)_ | Custom command template |
+| `PHONE_LINK_RELAY_CMD` | _(none)_ | Custom command template passed to the relay |
 | `PHONE_LINK_CLAUDE_TIMEOUT` | `120` | Relay subprocess timeout (s) |
 
 ---
 
 ## Prompt relay — supported CLIs
 
-Relay auto-detects the first available CLI in PATH. Override with `PHONE_LINK_RELAY_CLI`.
+Relay auto-detects the first available CLI in PATH. Override with `PHONE_LINK_RELAY_CLI`, or set `PHONE_LINK_RELAY_CMD` to run a custom template instead.
 
 | Value | Command used |
 |-------|-------------|
@@ -87,8 +119,8 @@ Relay auto-detects the first available CLI in PATH. Override with `PHONE_LINK_RE
 | `custom` | Set `PHONE_LINK_RELAY_CMD` to a template, e.g. `my-agent --input {prompt}` |
 
 Custom example (any HTTP agent):
-```json
-"PHONE_LINK_RELAY_CMD": "llm -m gpt-4o {prompt}"
+```bash
+PHONE_LINK_RELAY_CMD='llm -m gpt-4o {prompt}'
 ```
 
 The relay fetches uploaded file context from the bridge, builds an enriched prompt
@@ -110,7 +142,7 @@ Paste that URL into **Settings → Prompt Relay URL** on the phone. Saved in loc
 ## Running the bridge manually (without MCP)
 
 ```bash
-uv run python bridge/hermes_phone_bridge.py \
+uv run python bridge/phone_bridge.py \
   --host 0.0.0.0 \
   --port 8765 \
   --token dev-token \

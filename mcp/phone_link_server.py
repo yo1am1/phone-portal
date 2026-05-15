@@ -35,7 +35,7 @@ from plugin.phone import tools  # noqa: E402
 
 BRIDGE_TOKEN = os.getenv("PHONE_LINK_TOKEN", "dev-token")
 BRIDGE_PORT = urllib.parse.urlparse(_bridge_url).port or 8765
-BRIDGE_SCRIPT = ROOT / "bridge" / "hermes_phone_bridge.py"
+BRIDGE_SCRIPT = ROOT / "bridge" / "phone_bridge.py"
 
 RELAY_PORT = int(os.getenv("PHONE_LINK_RELAY_PORT", "9001"))
 RELAY_CLI = os.getenv("PHONE_LINK_RELAY_CLI", "auto")

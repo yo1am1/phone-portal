@@ -7,10 +7,10 @@ End-to-end test path. Takes ~5 minutes.
 ## Install (one command)
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/yo1am1/phone-portal/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/yo1am1/phone-portal/main/install.sh | bash
 ```
 
-Then **restart Claude Code**.
+Then **restart your agent(s)**.
 
 ---
 
@@ -19,8 +19,8 @@ Then **restart Claude Code**.
 Ask Claude Code:
 > *"what is my phone portal status?"*
 
-Expected: Claude calls `phone_status`, returns connected/disconnected info.
-If it errors — MCP server did not start. Run `claude mcp list` to verify `phone-portal` is registered.
+Expected: your agent calls `phone_status`, returns connected/disconnected info.
+If it errors — MCP server did not start. Run `claude mcp list` or `codex mcp list` to verify `phone-portal` is registered.
 
 ---
 
@@ -115,8 +115,8 @@ Share a photo from Photos app → should offer *Phone Portal* as destination (An
 
 | Problem | Fix |
 |---------|-----|
-| MCP not found | `claude mcp list` — verify `phone-portal` is registered |
-| Bridge not starting | `uv run python bridge/hermes_phone_bridge.py --port 8765 --token dev-token` manually, check errors |
+| MCP not found | `claude mcp list` or `codex mcp list` — verify `phone-portal` is registered |
+| Bridge not starting | `uv run python bridge/phone_bridge.py --port 8765 --token dev-token` manually, check errors |
 | Phone can't reach bridge | Same WiFi? Try `http://192.168.x.x:8765/health` in phone browser |
 | Token rejected | Token in URL must match `PHONE_LINK_TOKEN` in MCP config |
 | Relay not responding | `curl http://127.0.0.1:9001/health` — check CLI is installed and in PATH |
