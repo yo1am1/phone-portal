@@ -13,9 +13,15 @@ const filesInputEl    = document.getElementById('filesInput');
 const fileDropHintEl  = document.getElementById('fileDropHint');
 const uploadBtn       = document.getElementById('uploadBtn');
 const uploadStatusEl  = document.getElementById('uploadStatus');
-const cameraInputEl   = document.getElementById('cameraInput');
-const cameraHintEl    = document.getElementById('cameraHint');
-const cameraStatusEl  = document.getElementById('cameraStatus');
+const cameraInputEl      = document.getElementById('cameraInput');
+const cameraHintEl       = document.getElementById('cameraHint');
+const cameraStatusEl     = document.getElementById('cameraStatus');
+const cameraPreviewGrid  = document.getElementById('cameraPreviewGrid');
+const cameraUploadRow    = document.getElementById('cameraUploadRow');
+const cameraUploadBtn    = document.getElementById('cameraUploadBtn');
+const cameraClearBtn     = document.getElementById('cameraClearBtn');
+
+let cameraQueue = []; // accumulated File objects before upload
 
 const pasteNameEl     = document.getElementById('pasteName');
 const pasteTextEl     = document.getElementById('pasteText');
@@ -337,13 +343,43 @@ async function uploadFiles() {
   });
 }
 
-// ── Camera tab upload ──
-async function uploadCameraPhoto() {
-  const files = Array.from(cameraInputEl.files || []);
-  if (!files.length) return;
-  cameraHintEl.textContent = '📷  Tap to open camera';
-  await uploadFileList(files, cameraStatusEl, () => {
-    cameraInputEl.value = '';
+// ── Camera queue ──
+function renderCameraQueue() {
+  cameraPreviewGrid.innerHTML = '';
+  cameraQueue.forEach((file, idx) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'preview-item';
+    const img = document.createElement('img');
+    img.src = URL.createObjectURL(file);
+    img.alt = file.name;
+    const rm = document.createElement('button');
+    rm.className = 'preview-remove';
+    rm.textContent = '✕';
+    rm.addEventListener('click', () => {
+      URL.revokeObjectURL(img.src);
+      cameraQueue.splice(idx, 1);
+      renderCameraQueue();
+    });
+    wrap.appendChild(img);
+    wrap.appendChild(rm);
+    cameraPreviewGrid.appendChild(wrap);
+  });
+  const hasPhotos = cameraQueue.length > 0;
+  cameraUploadRow.style.display = hasPhotos ? '' : 'none';
+  cameraUploadBtn.textContent = `Upload ${cameraQueue.length} Photo${cameraQueue.length !== 1 ? 's' : ''}`;
+  cameraStatusEl.textContent = hasPhotos ? `${cameraQueue.length} photo(s) queued — tap camera to add more.` : '';
+  cameraStatusEl.className = hasPhotos ? 'status-text ok' : 'status-text muted';
+}
+
+async function uploadCameraQueue() {
+  if (!cameraQueue.length) return;
+  await uploadFileList([...cameraQueue], cameraStatusEl, () => {
+    cameraQueue.forEach((_, i) => {
+      const img = cameraPreviewGrid.querySelectorAll('img')[i];
+      if (img) URL.revokeObjectURL(img.src);
+    });
+    cameraQueue = [];
+    renderCameraQueue();
   });
 }
 
@@ -506,20 +542,39 @@ filesInputEl.addEventListener('change', () => {
   }
 });
 
-// Camera: auto-upload immediately after capture
+// Camera: append captured photo to queue, show preview
 cameraInputEl.addEventListener('change', async () => {
   if (!cameraInputEl.files || !cameraInputEl.files.length) return;
-  cameraHintEl.textContent = '⏳  Uploading…';
+  const raw = cameraInputEl.files[0];
+  cameraInputEl.value = ''; // reset so same photo can be recaptured if needed
+  cameraHintEl.textContent = '⏳  Processing…';
+  const file = await resizeImageIfNeeded(raw);
+  cameraQueue.push(file);
+  renderCameraQueue();
+  cameraHintEl.textContent = '📷  Tap to capture';
+  log(`Camera: queued ${file.name} (${formatBytes(file.size)})`);
+});
+
+cameraUploadBtn.addEventListener('click', async () => {
   try {
-    await uploadCameraPhoto();
-    cameraHintEl.textContent = '✓  Uploaded — tap to take another';
-    setTimeout(() => { cameraHintEl.textContent = '📷  Tap to open camera'; }, 3000);
+    setBusy(cameraUploadBtn, 'Uploading…');
+    await uploadCameraQueue();
   } catch (err) {
     cameraStatusEl.textContent = 'Upload failed: ' + err.message;
     cameraStatusEl.className = 'status-text bad';
-    cameraHintEl.textContent = '📷  Tap to open camera';
     log('Camera upload failed: ' + err.message);
+  } finally {
+    clearBusy(cameraUploadBtn);
   }
+});
+
+cameraClearBtn.addEventListener('click', () => {
+  cameraQueue.forEach((_, i) => {
+    const img = cameraPreviewGrid.querySelectorAll('img')[i];
+    if (img) URL.revokeObjectURL(img.src);
+  });
+  cameraQueue = [];
+  renderCameraQueue();
 });
 
 

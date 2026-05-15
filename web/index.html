@@ -10,7 +10,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Phone Link">
   <meta name="theme-color" content="#5b8cff">
-  <link rel="stylesheet" href="/static/styles.css?v=8">
+  <link rel="stylesheet" href="/static/styles.css?v=9">
 </head>
 <body>
   <!-- Header -->
@@ -79,10 +79,15 @@
         <!-- Camera tab -->
         <div class="tab-panel hidden" id="tabCamera">
           <label class="file-drop camera-drop" for="cameraInput">
-            <span id="cameraHint">📷  Tap to open camera</span>
+            <span id="cameraHint">📷  Tap to capture</span>
             <input id="cameraInput" type="file" accept="image/*" capture="environment">
           </label>
-          <p id="cameraStatus" class="status-text muted">Photo uploads automatically after capture.</p>
+          <div id="cameraPreviewGrid" class="preview-grid"></div>
+          <div class="btn-row" id="cameraUploadRow" style="display:none">
+            <button id="cameraUploadBtn" type="button" class="btn-primary">Upload Photos</button>
+            <button id="cameraClearBtn" type="button" class="btn-secondary">Clear</button>
+          </div>
+          <p id="cameraStatus" class="status-text muted"></p>
         </div>
 
         <!-- Text tab -->
@@ -164,6 +169,6 @@
       navigator.serviceWorker.register('/sw.js').catch(() => {});
     }
   </script>
-  <script src="/static/app.js?v=8"></script>
+  <script src="/static/app.js?v=9"></script>
 </body>
 </html>
