@@ -56,9 +56,25 @@ curl -fsSL https://raw.githubusercontent.com/yo1am1/phone-portal/main/install.sh
 ```
 
 **Private repo / fork:**
+
+If your repo is private, `raw.githubusercontent.com` may require auth. Two options:
+
+1) **GitHub CLI (`gh`)** (recommended):
 ```bash
+# gh auth login
 PHONE_PORTAL_REPO_URL=https://github.com/<you>/phone-portal \
-  curl -fsSL https://raw.githubusercontent.com/<you>/phone-portal/main/install.sh | bash
+  gh api -H "Accept: application/vnd.github.raw" \
+  /repos/<you>/phone-portal/contents/install.sh?ref=main | bash
+```
+
+2) **GitHub API with `GITHUB_TOKEN`**:
+```bash
+export GITHUB_TOKEN=... # needs repo read access
+PHONE_PORTAL_REPO_URL=https://github.com/<you>/phone-portal \
+  curl -fsSL \
+    -H "Authorization: Bearer $GITHUB_TOKEN" \
+    -H "Accept: application/vnd.github.raw" \
+    "https://api.github.com/repos/<you>/phone-portal/contents/install.sh?ref=main" | bash
 ```
 
 **Override defaults:**
