@@ -301,22 +301,33 @@ async function uploadFileList(rawFiles, statusEl, onSuccess) {
   statusEl.className = 'status-text busy';
 
   const bundle = [];
+  const seenNames = {};  // track duplicate names within this batch
   for (const raw of rawFiles) {
-    // Resize images that exceed limit before pre-flight check
     const file = await resizeImageIfNeeded(raw);
     if (file.size > MAX_UPLOAD_BYTES) {
       statusEl.textContent = `${file.name} is too large (${formatBytes(file.size)}). Max ${formatBytes(MAX_UPLOAD_BYTES)}.`;
       statusEl.className = 'status-text bad';
       return;
     }
-    log(`Reading ${file.name} (${formatBytes(file.size)})`);
+    // Ensure unique names so server dedup-by-name doesn't discard duplicates
+    let name = file.name;
+    if (seenNames[name] !== undefined) {
+      const dot = name.lastIndexOf('.');
+      const base = dot > 0 ? name.slice(0, dot) : name;
+      const ext  = dot > 0 ? name.slice(dot) : '';
+      seenNames[name]++;
+      name = `${base}_${seenNames[name]}${ext}`;
+    } else {
+      seenNames[name] = 0;
+    }
+    log(`Reading ${name} (${formatBytes(file.size)})`);
     const buffer = await file.arrayBuffer();
     const bytes = new Uint8Array(buffer);
     let binary = '';
     for (let i = 0; i < bytes.length; i += 65536) {
       binary += String.fromCharCode(...bytes.subarray(i, i + 65536));
     }
-    bundle.push({ name: file.name, mime_type: file.type || 'application/octet-stream', size: file.size, base64: btoa(binary) });
+    bundle.push({ name, mime_type: file.type || 'application/octet-stream', size: file.size, base64: btoa(binary) });
   }
 
   statusEl.textContent = `Uploading ${bundle.length} file(s)…`;
@@ -548,7 +559,12 @@ cameraInputEl.addEventListener('change', async () => {
   const raw = cameraInputEl.files[0];
   cameraInputEl.value = ''; // reset so same photo can be recaptured if needed
   cameraHintEl.textContent = '⏳  Processing…';
-  const file = await resizeImageIfNeeded(raw);
+  const resized = await resizeImageIfNeeded(raw);
+  // Stamp every camera photo with a unique timestamp so server never deduplicates
+  const dot = resized.name.lastIndexOf('.');
+  const ext = dot > 0 ? resized.name.slice(dot) : '.jpg';
+  const uniqueName = `photo_${Date.now()}${ext}`;
+  const file = new File([resized], uniqueName, { type: resized.type });
   cameraQueue.push(file);
   renderCameraQueue();
   cameraHintEl.textContent = '📷  Tap to capture';
