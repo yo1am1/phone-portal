@@ -1,4 +1,4 @@
-/* Phone Link Bridge — app.js v4 */
+/* Phone Link Bridge — app.js v5 */
 
 // ── DOM refs ──
 const statusPillEl    = document.getElementById('statusPill');
@@ -29,7 +29,6 @@ const fileListEl      = document.getElementById('fileList');
 const fileCountBadge  = document.getElementById('fileCountBadge');
 const sizeBarEl       = document.getElementById('sizeBar');
 const sizeMetaEl      = document.getElementById('sizeMeta');
-const suggestedActEl  = document.getElementById('suggestedActions');
 const zipBtn          = document.getElementById('zipBtn');
 const clearBtn        = document.getElementById('clearBtn');
 const zipStatusEl     = document.getElementById('zipStatus');
@@ -37,8 +36,6 @@ const zipStatusEl     = document.getElementById('zipStatus');
 const webhookUrlEl    = document.getElementById('webhookUrl');
 const saveWebhookBtn  = document.getElementById('saveWebhook');
 const webhookStatusEl = document.getElementById('webhookStatus');
-const relayUrlEl      = document.getElementById('relayUrl');
-const saveRelayBtn    = document.getElementById('saveRelay');
 
 const debugLogEl      = document.getElementById('debugLog');
 const toastEl         = document.getElementById('toast');
@@ -75,57 +72,6 @@ function showToast(msg, duration = 2500) {
   toastEl.textContent = msg;
   toastEl.classList.add('show');
   setTimeout(() => toastEl.classList.remove('show'), duration);
-}
-
-// iOS Safari over HTTP blocks navigator.clipboard and window.prompt.
-// Use a hidden textarea + execCommand as fallback, then show prompt text inline.
-async function copyText(text) {
-  // 1. Modern clipboard API (works on HTTPS or localhost)
-  if (navigator.clipboard && window.isSecureContext) {
-    await navigator.clipboard.writeText(text);
-    return;
-  }
-  // 2. Legacy execCommand (iOS Safari over HTTP)
-  const el = document.createElement('textarea');
-  el.value = text;
-  el.style.cssText = 'position:fixed;top:0;left:0;opacity:0;font-size:16px';
-  document.body.appendChild(el);
-  el.focus();
-  el.select();
-  const ok = document.execCommand('copy');
-  document.body.removeChild(el);
-  if (!ok) throw new Error('execCommand copy failed');
-}
-
-function showPromptPanel(text) {
-  // Show the prompt text in a selectable panel — last resort when clipboard unavailable.
-  let panel = document.getElementById('promptPanel');
-  if (!panel) {
-    panel = document.createElement('div');
-    panel.id = 'promptPanel';
-    panel.style.cssText = [
-      'position:fixed;bottom:80px;left:16px;right:16px;z-index:1000',
-      'background:#1a2444;border:1px solid #5b8cff;border-radius:12px',
-      'padding:12px;font-size:14px;color:#edf2ff',
-    ].join(';');
-    const close = document.createElement('button');
-    close.textContent = '✕';
-    close.style.cssText = 'float:right;background:none;border:none;color:#9fb0e0;font-size:16px;cursor:pointer;padding:0 4px';
-    close.onclick = () => panel.remove();
-    const label = document.createElement('div');
-    label.style.cssText = 'font-size:11px;color:#9fb0e0;margin-bottom:6px;text-transform:uppercase';
-    label.textContent = 'Copy this prompt:';
-    const textarea = document.createElement('textarea');
-    textarea.style.cssText = 'width:100%;background:#0b1020;border:1px solid #2b3768;border-radius:6px;color:#edf2ff;padding:8px;font-size:13px;resize:none;height:80px';
-    textarea.readOnly = true;
-    panel.appendChild(close);
-    panel.appendChild(label);
-    panel.appendChild(textarea);
-    document.body.appendChild(panel);
-  }
-  panel.querySelector('textarea').value = text;
-  panel.querySelector('textarea').select();
-  panel.style.display = 'block';
 }
 
 function formatBytes(bytes) {
@@ -259,7 +205,6 @@ async function refreshStatus() {
     // Auto-collapse connect section when connected
     collapseSection('bodyConnect');
     renderFiles(data.files || []);
-    renderSuggestedActions(data.files || []);
     startMessagePoller();
   } catch (err) {
     setConnected(false, 'Not connected');
@@ -321,71 +266,6 @@ function renderFiles(files) {
     li.appendChild(info);
     li.appendChild(delBtn);
     fileListEl.appendChild(li);
-  }
-}
-
-// ── Suggested prompts ──
-function getSuggestedPrompts(file) {
-  if (!file) return [];
-  const name = (file.name || '').toLowerCase();
-  const type = (file.type || '').toLowerCase();
-  const isImage = type.startsWith('image/') || /\.(png|jpg|jpeg|gif|webp)$/.test(name);
-  const isPdf   = type.includes('pdf') || name.endsWith('.pdf');
-  const isZip   = type.includes('zip') || name.endsWith('.zip');
-  const isAudio = type.startsWith('audio/') || /\.(mp3|wav|m4a|flac)$/.test(name);
-  const isText  = type.startsWith('text/') || /\.(txt|md|csv|log|json|yaml|yml)$/.test(name);
-  if (isImage) return ['Describe the latest image file.', 'Extract any text from the latest image (OCR).', 'Generate a short caption for the latest image.'];
-  if (isPdf)   return ['Summarize the latest PDF.', 'Extract tables from the latest PDF.', 'List the key points from the latest PDF.'];
-  if (isZip)   return ['List the contents of the latest ZIP and summarize each file.', 'Extract all text files from the latest ZIP.'];
-  if (isAudio) return ['Transcribe the latest audio file.', 'Summarize the latest audio file.'];
-  if (isText)  return ['Summarize the latest file.', 'Extract action items / TODOs from the latest file.', 'Convert the latest file to markdown.'];
-  return ['Summarize the latest file.', 'Extract key entities from the latest file.'];
-}
-
-function renderSuggestedActions(files) {
-  suggestedActEl.innerHTML = '';
-  if (!files || !files.length) {
-    suggestedActEl.innerHTML = '<span class="muted" style="font-size:13px">Upload a file to see suggestions.</span>';
-    return;
-  }
-  const latest = files.reduce((a, b) => (a.uploaded_at || 0) > (b.uploaded_at || 0) ? a : b);
-  for (const prompt of getSuggestedPrompts(latest)) {
-    const chip = document.createElement('button');
-    chip.type = 'button';
-    chip.className = 'chip';
-    chip.textContent = prompt;
-    chip.addEventListener('click', async () => {
-      const relayUrl = localStorage.getItem('phoneLinkRelayUrl') || '';
-      if (relayUrl) {
-        const orig = chip.textContent;
-        chip.textContent = '⏳ Sending…';
-        chip.disabled = true;
-        try {
-          await fetch(relayUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt, session_id: sessionId }),
-          });
-          showToast('Prompt sent to agent!');
-          chip.textContent = '✓ Sent';
-          setTimeout(() => { chip.textContent = orig; chip.disabled = false; }, 2500);
-        } catch (e) {
-          log('Relay failed: ' + (e.message || e) + ' — falling back to clipboard');
-          chip.textContent = orig;
-          chip.disabled = false;
-          try { await copyText(prompt); showToast('Relay failed — copied instead'); }
-          catch { showPromptPanel(prompt); }
-        }
-      } else {
-        try {
-          await copyText(prompt);
-          showToast('Prompt copied!');
-        } catch {
-          showPromptPanel(prompt);
-        }
-      }
-    });
-    suggestedActEl.appendChild(chip);
   }
 }
 
@@ -584,8 +464,6 @@ function loadStoredValues() {
   }
   const storedWebhook = localStorage.getItem('phoneLinkWebhook') || localStorage.getItem('hermesPhoneLinkWebhook') || '';
   if (storedWebhook) webhookUrlEl.value = storedWebhook;
-  const storedRelay = localStorage.getItem('phoneLinkRelayUrl') || '';
-  if (storedRelay && relayUrlEl) relayUrlEl.value = storedRelay;
 }
 
 // ── Event listeners ──
@@ -610,12 +488,22 @@ filesInputEl.addEventListener('change', () => {
 copyLinkBtn.addEventListener('click', async () => {
   const href = directLinkEl.href;
   if (!href || href === '#') return;
-  try {
-    await copyText(href);
-    showToast('Link copied!');
-  } catch {
-    showPromptPanel(href);
+  // Web Share API — opens native iOS share sheet
+  if (navigator.share) {
+    try { await navigator.share({ url: href, title: 'Phone Link' }); return; } catch {}
   }
+  if (navigator.clipboard && window.isSecureContext) {
+    try { await navigator.clipboard.writeText(href); showToast('Link copied!'); return; } catch {}
+  }
+  // execCommand fallback (iOS Safari over HTTP)
+  const el = document.createElement('input');
+  el.value = href;
+  el.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+  document.body.appendChild(el);
+  el.focus(); el.select();
+  document.execCommand('copy');
+  document.body.removeChild(el);
+  showToast('Link copied!');
 });
 
 saveTokenBtn.addEventListener('click', async () => {
@@ -710,15 +598,6 @@ saveWebhookBtn.addEventListener('click', async () => {
   }
 });
 
-if (saveRelayBtn) {
-  saveRelayBtn.addEventListener('click', () => {
-    const url = (relayUrlEl.value || '').trim();
-    localStorage.setItem('phoneLinkRelayUrl', url);
-    showToast(url ? 'Relay URL saved — chip taps will fire to your agent.' : 'Relay URL cleared.');
-    log('Relay URL: ' + (url || '(cleared)'));
-  });
-}
-
 // ── Boot ──
 (async function init() {
   try {
@@ -728,7 +607,6 @@ if (saveRelayBtn) {
     loadStoredValues();
     handleShareLanding();
     renderMessages();
-    renderSuggestedActions([]);
     await loadMeta();
     if (tokenEl.value) {
       await refreshStatus();

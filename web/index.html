@@ -116,11 +116,6 @@
         </div>
         <div class="meter-meta" id="sizeMeta">0 B used</div>
         <ul id="fileList" class="file-list"></ul>
-        <div class="suggestions" id="suggestionsWrap">
-          <div class="label">Suggested prompts</div>
-          <div id="suggestedActions" class="chips"></div>
-          <p class="hint">Tap a chip to copy the prompt, then paste it into your agent.</p>
-        </div>
         <div class="btn-row">
           <button id="zipBtn" type="button" class="btn-secondary">Create ZIP</button>
           <button id="clearBtn" type="button" class="btn-danger">Clear All</button>
@@ -143,19 +138,6 @@
           <button id="saveWebhook" type="button" class="btn-secondary">Save Webhook</button>
         </div>
         <p id="webhookStatus" class="status-text muted"></p>
-
-        <div class="settings-divider"></div>
-
-        <label class="field-label" for="relayUrl">Prompt Relay URL</label>
-        <input id="relayUrl" type="text" placeholder="http://127.0.0.1:9001/prompt">
-        <p class="hint">
-          When set, tapping a suggestion chip sends the prompt here instead of copying to clipboard.<br>
-          Your relay server receives <code>{"prompt":"…","session_id":"…"}</code> and can call any agent.<br>
-          Start the example relay: <code>uv run python relay/example_relay.py</code>
-        </p>
-        <div class="btn-row">
-          <button id="saveRelay" type="button" class="btn-secondary">Save Relay URL</button>
-        </div>
 
         <div class="settings-divider"></div>
 

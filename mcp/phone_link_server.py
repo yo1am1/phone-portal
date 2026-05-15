@@ -167,7 +167,6 @@ atexit.register(_cleanup)
 @asynccontextmanager
 async def _lifespan(server):
     _ensure_bridge()
-    _ensure_relay()
     yield
 
 
@@ -193,13 +192,6 @@ def phone_begin_upload() -> str:
     lines.append(f"existing_file_count: {data.get('existing_file_count', 0)}")
     lines.append(f"latest_uploaded_at: {data.get('latest_uploaded_at', 0.0)}")
     lines.append(f"connected: {data.get('connected', False)}")
-    if _relay_alive():
-        # Derive LAN IP from bridge URL so phone can reach relay too.
-        _parsed = urllib.parse.urlparse(url)
-        relay_url = f"http://{_parsed.hostname}:{RELAY_PORT}/prompt"
-        lines.append(f"\nPrompt relay running at: {relay_url}")
-        lines.append("In phone UI → Settings → Prompt Relay URL → set to the above URL (one-time setup).")
-        lines.append("After that, tapping a suggestion chip sends the prompt straight to the agent.")
     return "\n".join(lines)
 
 
