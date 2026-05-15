@@ -33,9 +33,6 @@ const zipBtn          = document.getElementById('zipBtn');
 const clearBtn        = document.getElementById('clearBtn');
 const zipStatusEl     = document.getElementById('zipStatus');
 
-const webhookUrlEl    = document.getElementById('webhookUrl');
-const saveWebhookBtn  = document.getElementById('saveWebhook');
-const webhookStatusEl = document.getElementById('webhookStatus');
 
 const debugLogEl      = document.getElementById('debugLog');
 const toastEl         = document.getElementById('toast');
@@ -420,29 +417,6 @@ function renderMessages() {
   }
 }
 
-// ── Webhook ──
-async function saveWebhook() {
-  const url = (webhookUrlEl.value || '').trim();
-  localStorage.setItem('phoneLinkWebhook', url);
-  if (!url) {
-    webhookStatusEl.textContent = 'Webhook cleared.';
-    webhookStatusEl.className = 'status-text muted';
-    return;
-  }
-  try {
-    await fetchJson('/api/web/set_webhook', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ session_id: sessionId, token: tokenEl.value, webhook_url: url }),
-    });
-    webhookStatusEl.textContent = 'Webhook saved.';
-    webhookStatusEl.className = 'status-text ok';
-    log('Webhook saved: ' + url);
-  } catch (err) {
-    webhookStatusEl.textContent = 'Save failed: ' + err.message;
-    webhookStatusEl.className = 'status-text bad';
-  }
-}
 
 // ── Share target landing ──
 function handleShareLanding() {
@@ -462,8 +436,6 @@ function loadStoredValues() {
     tokenEl.value = storedToken;
     localStorage.setItem('phoneLinkToken', storedToken);
   }
-  const storedWebhook = localStorage.getItem('phoneLinkWebhook') || localStorage.getItem('hermesPhoneLinkWebhook') || '';
-  if (storedWebhook) webhookUrlEl.value = storedWebhook;
 }
 
 // ── Event listeners ──
@@ -587,16 +559,6 @@ clearBtn.addEventListener('click', async () => {
   }
 });
 
-saveWebhookBtn.addEventListener('click', async () => {
-  try {
-    setBusy(saveWebhookBtn, 'Saving…');
-    await saveWebhook();
-  } catch (err) {
-    log('Webhook save error: ' + err.message);
-  } finally {
-    clearBusy(saveWebhookBtn);
-  }
-});
 
 // ── Boot ──
 (async function init() {

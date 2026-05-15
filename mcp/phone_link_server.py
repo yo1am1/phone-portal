@@ -211,7 +211,8 @@ def phone_wait_for_files(
     since_uploaded_at: float = 0.0,
 ) -> str:
     """Wait for new files from the phone upload page, then return the file list.
-    Pass since_count and since_uploaded_at from phone_begin_upload to skip pre-existing files."""
+    Pass since_count and since_uploaded_at from phone_begin_upload to skip pre-existing files.
+    After files arrive and you process them, call phone_send_text to send results back to the phone."""
     _ensure_bridge()
     return tools.phone_wait_for_files({
         "timeout_seconds": timeout_seconds,
@@ -250,7 +251,8 @@ def phone_read_file(file_id: str, max_bytes: int = 200_000) -> str:
 
 @mcp.tool()
 def phone_read_latest_file(max_bytes: int = 200_000) -> str:
-    """Read the most recently uploaded phone file without needing a file_id."""
+    """Read the most recently uploaded phone file without needing a file_id.
+    After reading and processing the file, call phone_send_text to send the result back to the phone."""
     _ensure_bridge()
     return tools.phone_read_latest_file({"max_bytes": max_bytes})
 
@@ -271,7 +273,8 @@ def phone_create_zip(name: str = "") -> str:
 
 @mcp.tool()
 def phone_send_text(text: str, title: str = "") -> str:
-    """Send a text message from the agent to the phone display."""
+    """Send a text message from the agent to the phone's 'From Agent' section.
+    Use this after reading/processing a file to deliver results back to the user on their phone."""
     _ensure_bridge()
     return tools.phone_send_text({"text": text, "title": title})
 

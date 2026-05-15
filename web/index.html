@@ -36,14 +36,14 @@
         <span class="section-title">Connect</span>
         <span class="chevron">▾</span>
       </button>
+      <!-- Link row always visible — copy button must be accessible even when collapsed -->
+      <div class="link-row">
+        <a id="directLink" href="#" target="_blank" rel="noreferrer" class="direct-link">loading…</a>
+        <button type="button" class="btn-copy" id="copyLink" title="Share / copy link">Share</button>
+      </div>
       <div class="section-body" id="bodyConnect">
         <div class="qr-wrap">
           <img id="qrImage" class="qr" src="/qr.svg" alt="QR code">
-        </div>
-        <div class="link-row">
-          <span class="label">Direct link</span>
-          <a id="directLink" href="#" target="_blank" rel="noreferrer" class="direct-link">loading…</a>
-          <button type="button" class="btn-copy" id="copyLink" title="Copy link">Copy</button>
         </div>
         <div class="field-row">
           <input id="token" type="password" placeholder="Token (e.g. dev-token)" autocomplete="off">
@@ -131,18 +131,8 @@
         <span class="chevron">▾</span>
       </button>
       <div class="section-body collapsed" id="bodySettings">
-        <label class="field-label" for="webhookUrl">Webhook URL</label>
-        <input id="webhookUrl" type="text" placeholder="http://127.0.0.1:XXXX/webhook">
-        <p class="hint">Bridge POSTs JSON to this URL after each upload, paste, share, or zip. Payload: <code>{"event":"upload","timestamp":…,"file_count":…}</code></p>
-        <div class="btn-row">
-          <button id="saveWebhook" type="button" class="btn-secondary">Save Webhook</button>
-        </div>
-        <p id="webhookStatus" class="status-text muted"></p>
-
-        <div class="settings-divider"></div>
-
         <div class="pwa-hint">
-          <span class="hint">Add to Home Screen in your mobile browser for one-tap sharing</span>
+          <span class="hint">Add to Home Screen in your mobile browser for one-tap access</span>
         </div>
       </div>
     </div>
