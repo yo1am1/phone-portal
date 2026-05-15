@@ -36,11 +36,6 @@
         <span class="section-title">Connect</span>
         <span class="chevron">▾</span>
       </button>
-      <!-- Link row always visible — copy button must be accessible even when collapsed -->
-      <div class="link-row">
-        <a id="directLink" href="#" target="_blank" rel="noreferrer" class="direct-link">loading…</a>
-        <button type="button" class="btn-copy" id="copyLink" title="Copy link">Copy</button>
-      </div>
       <div class="section-body" id="bodyConnect">
         <div class="qr-wrap">
           <img id="qrImage" class="qr" src="/qr.svg" alt="QR code">
@@ -155,6 +150,6 @@
       navigator.serviceWorker.register('/sw.js').catch(() => {});
     }
   </script>
-  <script src="/static/app.js?v=6"></script>
+  <script src="/static/app.js?v=7"></script>
 </body>
 </html>

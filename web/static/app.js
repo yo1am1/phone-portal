@@ -5,9 +5,7 @@ const statusPillEl    = document.getElementById('statusPill');
 const statusPillText  = document.getElementById('statusPillText');
 const connectStatusEl = document.getElementById('connectStatus');
 const tokenEl         = document.getElementById('token');
-const directLinkEl    = document.getElementById('directLink');
 const qrImageEl       = document.getElementById('qrImage');
-const copyLinkBtn     = document.getElementById('copyLink');
 const saveTokenBtn    = document.getElementById('saveToken');
 const refreshBtn      = document.getElementById('refresh');
 
@@ -181,12 +179,8 @@ function setConnected(connected, label) {
 
 // ── Meta ──
 async function loadMeta() {
-  const meta = await fetchJson('/api/meta');
-  const url = meta.public_url;
-  directLinkEl.href = url;
-  directLinkEl.textContent = url;
   qrImageEl.src = '/qr.svg?' + Date.now();
-  log('Meta loaded: ' + url);
+  log('QR loaded.');
 }
 
 // ── Refresh status ──
@@ -457,24 +451,6 @@ filesInputEl.addEventListener('change', () => {
   }
 });
 
-copyLinkBtn.addEventListener('click', () => {
-  const href = directLinkEl.href;
-  if (!href || href === '#') return;
-  // execCommand is most reliable on iOS Safari over HTTP
-  const el = document.createElement('input');
-  el.value = href;
-  el.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0;font-size:16px';
-  document.body.appendChild(el);
-  el.focus();
-  el.setSelectionRange(0, el.value.length);
-  try {
-    document.execCommand('copy');
-    showToast('Link copied!');
-  } catch {
-    showToast(href);  // show URL as toast so user can manually copy
-  }
-  document.body.removeChild(el);
-});
 
 saveTokenBtn.addEventListener('click', async () => {
   try {
